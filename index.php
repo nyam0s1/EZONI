@@ -67,7 +67,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="apple-mobile-web-app-title" content="Ezoni Farm">
     <link rel="apple-touch-icon" href="images/logo.png">
 
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="CSS/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body class="login-page">
