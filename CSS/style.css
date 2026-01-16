@@ -1,0 +1,687 @@
+/* =========================================
+   0. RESPONSIVE BASE (The "Comfort" Fix)
+   ========================================= */
+html {
+    font-size: 16px;
+}
+
+@media (max-width: 1024px) {
+    html {
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    html {
+        font-size: 14px;
+    }
+}
+
+/* =========================================
+   1. GLOBAL RESETS & LAYOUTS
+   ========================================= */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* LOGIN PAGE THEME */
+body.login-body {
+    background: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)),
+        url("https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?q=80&w=2940&auto=format&fit=crop");
+    background-size: cover;
+    background-position: center;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    padding: 20px;
+}
+
+/* DASHBOARD THEME */
+body.dashboard-body {
+    background: linear-gradient(rgba(14, 17, 23, 0.92), rgba(14, 17, 23, 0.92)),
+        url("https://images.unsplash.com/photo-1444858291040-58f756a3bdd6?q=80&w=2500&auto=format&fit=crop");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color: #fafafa;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* =========================================
+   2. SIDEBAR (RETRACTABLE)
+   ========================================= */
+.sidebar {
+    width: 250px;
+    background-color: rgba(38, 39, 48, 0.95);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    padding-top: 0;
+    position: relative;
+    z-index: 100;
+}
+
+/* Sidebar Profile */
+.sidebar-profile {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-profile small {
+    display: block;
+    color: #888;
+    font-size: 0.8rem;
+    margin-bottom: 5px;
+}
+
+.sidebar-profile h3 {
+    color: white;
+    font-size: 1.1rem;
+    margin: 0 0 5px 0;
+    font-weight: 600;
+}
+
+.role-badge-small {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #ccc;
+}
+
+/* Hamburger Toggle Button */
+.sidebar-toggle {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1.1rem;
+    cursor: pointer;
+    margin: 0;
+    padding: 15px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 101;
+}
+
+.sidebar-toggle:hover {
+    color: white;
+}
+
+/* Collapsed State */
+.sidebar.collapsed {
+    width: 70px;
+    padding-top: 60px;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    right: 50%;
+    transform: translateX(50%);
+    top: 10px;
+}
+
+.sidebar.collapsed .sidebar-profile,
+.sidebar.collapsed h3,
+.sidebar.collapsed .role-badge,
+.sidebar.collapsed .nav-text {
+    display: none;
+}
+
+.sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding: 15px 0;
+}
+
+.sidebar.collapsed .nav-link i {
+    margin-right: 0;
+    font-size: 1.3rem;
+}
+
+/* Links */
+.nav-link {
+    text-decoration: none;
+    color: #c0c0c0;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    transition: 0.2s;
+    font-size: 0.95rem;
+    border-left: 4px solid transparent;
+    white-space: nowrap;
+}
+
+.nav-link i {
+    width: 25px;
+    text-align: center;
+    margin-right: 15px;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: white;
+    border-left-color: #4CAF50;
+}
+
+.logout-btn {
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ff4b4b;
+}
+
+.logout-btn:hover {
+    background-color: rgba(255, 75, 75, 0.1);
+    border-left-color: #ff4b4b;
+}
+
+/* Mobile Close Button */
+.mobile-close-btn {
+    display: none;
+}
+
+/* =========================================
+   3. MAIN CONTENT
+   ========================================= */
+.main-content {
+    flex: 1;
+    padding: 0 30px 30px 30px;
+    overflow-y: auto;
+    background-color: transparent;
+    position: relative;
+}
+
+/* Sticky Top Bar */
+.top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    background: rgba(14, 17, 23, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin: 0 -30px 30px -30px;
+    padding: 15px 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* Adjusted for Home Btn */
+    min-height: 60px;
+}
+
+.brand-title {
+    font-size: 2rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin: 0;
+    background: linear-gradient(90deg, #FFD700, #4CAF50, #FFD700);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shine 6s linear infinite;
+    text-shadow: 0px 0px 15px rgba(76, 175, 80, 0.2);
+}
+
+@keyframes shine {
+    to {
+        background-position: 200% center;
+    }
+}
+
+/* =========================================
+   4. COMPONENTS
+   ========================================= */
+.card,
+.metric-card {
+    background: rgba(38, 39, 48, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.metric-card {
+    padding: 20px;
+}
+
+.metric-card h4 {
+    color: #aaa;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.metric-card .value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: white;
+}
+
+.metric-card .sub-text {
+    font-size: 0.85rem;
+    color: #ccc;
+    margin-top: 5px;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+/* Tables */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #ccc;
+    font-weight: 600;
+    border-bottom: 2px solid #444;
+}
+
+.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #ddd;
+    vertical-align: middle;
+}
+
+.data-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Forms */
+.form-container {
+    max-width: 600px;
+    margin: 40px auto;
+}
+
+.form-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    position: relative;
+    justify-content: center;
+}
+
+.form-header .back-btn {
+    position: absolute;
+    left: 0;
+    text-decoration: none;
+    color: #ddd;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+input,
+select {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    border: 1px solid #555;
+    border-radius: 5px;
+    width: 100%;
+    outline: none;
+}
+
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+}
+
+
+/* Badges */
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.badge-green {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+    border: 1px solid #4CAF50;
+}
+
+.badge-red {
+    background: rgba(255, 75, 75, 0.2);
+    color: #ff4b4b;
+    border: 1px solid #ff4b4b;
+}
+
+.badge-blue {
+    background: rgba(33, 150, 243, 0.2);
+    color: #2196F3;
+    border: 1px solid #2196F3;
+}
+
+.badge-orange {
+    background: #ff9800;
+    color: #fff;
+}
+
+/* Account Deletion Link */
+.delete-account-link {
+    color: #666;
+    text-decoration: none;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.delete-account-link:hover {
+    color: #ff4b4b;
+    background: rgba(255, 75, 75, 0.1);
+}
+
+/* Settings Tabs */
+.tab-container {
+    margin-bottom: 20px;
+}
+
+.tab-header {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: #888;
+    padding: 12px 25px;
+    cursor: pointer;
+    font-weight: 600;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-btn.active {
+    color: #4CAF50;
+    border-bottom-color: #4CAF50;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* =========================================
+   5. MOBILE RESPONSIVENESS (Admin Side)
+   ========================================= */
+.mobile-toggle {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        height: 100vh;
+        left: -250px;
+        box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar.mobile-open {
+        left: 0;
+        width: 250px;
+    }
+
+    .sidebar-toggle {
+        display: none !important;
+    }
+
+    .mobile-toggle {
+        display: block;
+        font-size: 1.3rem;
+        color: white;
+        background: none;
+        border: none;
+        cursor: pointer;
+        position: absolute;
+        left: 15px;
+    }
+
+    .mobile-close-btn {
+        display: block;
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: none;
+        border: none;
+        color: #ff4b4b;
+        font-size: 1.5rem;
+        cursor: pointer;
+        z-index: 1000;
+    }
+
+    .main-content {
+        padding: 0 10px 15px 10px;
+        width: 100%;
+        margin-left: 0 !important;
+    }
+
+    .top-bar {
+        margin: 0 -10px 20px -10px;
+        padding: 15px;
+    }
+
+    /* Responsive Tables (Card View) */
+    .data-table thead {
+        display: none;
+    }
+
+    .data-table,
+    .data-table tbody,
+    .data-table tr,
+    .data-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .data-table tr {
+        background: rgba(255, 255, 255, 0.03);
+        margin-bottom: 15px;
+        padding: 15px;
+        border-radius: 10px;
+    }
+
+    .data-table td {
+        text-align: right;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .data-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #888;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+}
+
+/* =========================================
+   6. NEW: LAUNCHPAD / HOME GRID STYLES
+   (Added strictly for User Dashboard "App" Look)
+   ========================================= */
+
+/* The Grid Container */
+.launchpad-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* The Cards (Tiles) */
+.app-card {
+    background: rgba(38, 39, 48, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 30px 20px;
+    text-align: center;
+    text-decoration: none;
+    color: white;
+    transition: transform 0.2s, background 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+}
+
+.app-card:hover {
+    transform: translateY(-5px);
+    background: rgba(38, 39, 48, 0.9);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.app-card i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.app-card span {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Card Colors */
+.card-stock i {
+    color: #FF9800;
+}
+
+.card-animals i {
+    color: #2196F3;
+}
+
+.card-sales i {
+    color: #4CAF50;
+}
+
+.card-reports i {
+    color: #E91E63;
+}
+
+.card-logout {
+    border-color: rgba(255, 75, 75, 0.3);
+}
+
+.card-logout i {
+    color: #ff4b4b;
+}
+
+.card-delete i {
+    color: #888;
+}
+
+.card-overview {
+    border-top: 3px solid #fff;
+}
+
+/* Special style for Overview Stats */
+.card-overview i {
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* Home Button (In Header) */
+.home-btn {
+    text-decoration: none;
+    color: #ccc;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 15px;
+    border-radius: 20px;
+    transition: 0.2s;
+}
+
+.home-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+/* =========================================
+   7. FORCE FORM BUTTONS TO THE RIGHT
+   ========================================= */
+.card form button {
+    /* Stop button from stretching full width */
+    width: auto !important;
+
+    /* Push to the right side of the form */
+    align-self: flex-end !important;
+
+    /* Add a little space above */
+    margin-top: 15px;
+
+    /* Ensure it's not too small to tap */
+    min-width: 120px;
+}
+
+/* On small phones, let it stretch for easier tapping */
+@media (max-width: 480px) {
+    .card form button {
+        width: 100% !important;
+    }
+}

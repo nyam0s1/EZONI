@@ -1,0 +1,5 @@
+# Disable Directory Browsing (Prevents people seeing your file list)
+Options -Indexes
+
+# Hide PHP Errors from visitors
+php_flag display_errors Off
