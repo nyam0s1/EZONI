@@ -6,11 +6,8 @@ require 'includes/db.php';
 // If a user lands on this page, we assume they are opening the app fresh.
 // We destroy any old session to ensure a secure "fresh start".
 if (isset($_SESSION['user_id'])) {
-    // 1. Clear session variables
     session_unset();
-    // 2. Destroy the session
     session_destroy();
-    // 3. Restart a fresh session for the new login attempt
     session_start();
     session_regenerate_id(true);
 }
@@ -33,12 +30,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user = $stmt->fetch();
 
     if ($user && password_verify($password, $user['password'])) {
-        // Success: Set Session
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
 
-        // Redirect based on Role
         if ($user['role'] == 'admin') {
             header("Location: admin_dashboard.php");
         } else {
@@ -89,7 +84,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
             
             <div class="input-group">
-                <input type="password" name="password" placeholder="Password" required>
+                <input type="password" name="password" placeholder="Password" required autocomplete="off">
             </div>
 
             <button type="submit" class="login-btn">Sign In</button>
