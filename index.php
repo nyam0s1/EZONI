@@ -18,7 +18,7 @@ if (isset($_SESSION['user_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EZONI Farm - Login</title>
     <link rel="stylesheet" href="CSS/style.css">
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json?v=3">
     <link rel="icon" type="image/png" href="images/logo.png">
     <link rel="apple-touch-icon" href="images/logo.png">
     <meta name="theme-color" content="#0e1117">
