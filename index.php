@@ -1,65 +1,104 @@
 <?php
 session_start();
-// Redirect if already logged in
+require 'includes/db.php';
+
+// --- SECURITY: AUTO-LOGOUT ON APP OPEN ---
+// If a user lands on this page, we assume they are opening the app fresh.
+// We destroy any old session to ensure a secure "fresh start".
 if (isset($_SESSION['user_id'])) {
-    if ($_SESSION['role'] == 'admin') {
-        header("Location: admin_dashboard.php");
+    // 1. Clear session variables
+    session_unset();
+    // 2. Destroy the session
+    session_destroy();
+    // 3. Restart a fresh session for the new login attempt
+    session_start();
+    session_regenerate_id(true);
+}
+
+$error = '';
+
+// --- LOGIN LOGIC ---
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $input = trim($_POST['username']);
+    $password = trim($_POST['password']);
+
+    // Check if input is Email or Username
+    if (filter_var($input, FILTER_VALIDATE_EMAIL)) {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
     } else {
-        header("Location: user_dashboard.php");
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     }
-    exit();
+    
+    $stmt->execute([$input]);
+    $user = $stmt->fetch();
+
+    if ($user && password_verify($password, $user['password'])) {
+        // Success: Set Session
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['role'] = $user['role'];
+
+        // Redirect based on Role
+        if ($user['role'] == 'admin') {
+            header("Location: admin_dashboard.php");
+        } else {
+            header("Location: user_dashboard.php");
+        }
+        exit();
+    } else {
+        $error = "❌ Invalid username or password";
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EZONI Farm - Login</title>
-    <link rel="stylesheet" href="CSS/style.css">
-    <link rel="manifest" href="manifest.json?v=3">
-    <link rel="icon" type="image/png" href="images/logo.png">
-    <link rel="apple-touch-icon" href="images/logo.png">
+    <title>Ezoni Farm - Login</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0e1117">
+    
+    <link rel="manifest" href="manifest.json?v=4">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ezoni Farm">
+    <link rel="apple-touch-icon" href="images/logo.png">
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
+<body class="login-page">
 
-<body class="login-body">
-    <div class="login-container" style="text-align: center;">
+    <div class="login-container">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <img src="images/logo.png" alt="Ezoni Farm Logo" style="width: 120px; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        </div>
 
-        <img src="images/logo.png" alt="Ezoni Farm Logo" style="width: 120px; height: 120px; border-radius: 50%; margin-bottom: 15px; border: 3px solid #4CAF50; padding: 2px;">
-
-        <h2 style="margin-bottom: 25px; color:#fff;">EZONI Farm Login</h2>
-
-        <?php if (isset($_GET['msg']) && $_GET['msg'] == 'timeout'): ?>
-            <div style="background: rgba(255, 152, 0, 0.2); color: #FF9800; padding: 10px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #FF9800;">
-                ⚠️ Session expired. Please login again.
+        <?php if($error): ?>
+            <div class="error-msg" style="background: rgba(255, 75, 75, 0.2); color: #ff4b4b; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 15px; border: 1px solid #ff4b4b;">
+                <?php echo $error; ?>
             </div>
         <?php endif; ?>
 
-        <?php if (isset($_GET['registered'])): ?>
-            <div style="background: rgba(76, 175, 80, 0.2); color: #4CAF50; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                ✅ Registration successful! Please login.
+        <form method="POST">
+            <div class="input-group">
+                <input type="text" name="username" placeholder="Username or Email" required autocomplete="off">
             </div>
-        <?php endif; ?>
-
-        <?php if (isset($_GET['error'])): ?>
-            <div style="background: rgba(255, 75, 75, 0.2); color: #ff4b4b; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                ⚠️ <?php echo htmlspecialchars($_GET['error']); ?>
+            
+            <div class="input-group">
+                <input type="password" name="password" placeholder="Password" required>
             </div>
-        <?php endif; ?>
 
-        <form method="POST" action="auth_handler.php" style="display: flex; flex-direction: column; gap: 15px;">
-            <input type="hidden" name="action" value="login">
-            <input type="text" name="username" placeholder="Username or Email" required autocomplete="off">
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" style="background-color: #4CAF50; font-size: 1rem;">Sign In</button>
+            <button type="submit" class="login-btn">Sign In</button>
         </form>
-
-        <p style="margin-top: 20px; color: #ccc;">
-            New here? <a href="register.php" style="color: #4CAF50; text-decoration: none;">Create Account</a>
-        </p>
+        
+        <div class="login-footer">
+            New here? <a href="register.php">Create Account</a>
+        </div>
     </div>
-</body>
 
+</body>
 </html>
