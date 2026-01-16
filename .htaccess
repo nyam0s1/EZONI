@@ -1,5 +1,16 @@
-# Disable Directory Browsing (Prevents people seeing your file list)
+# 1. Disable Directory Browsing (Keep this!)
 Options -Indexes
 
-# Hide PHP Errors from visitors
+# 2. Hide PHP Errors (Keep this!)
 php_flag display_errors Off
+
+# 3. Force HTTPS (New - Critical for Login Security)
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# 4. Protect the .htaccess file itself (New)
+<Files .htaccess>
+Order Allow,Deny
+Deny from all
+</Files>
