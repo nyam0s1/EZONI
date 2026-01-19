@@ -5,6 +5,7 @@
  * - Categories: Strict Dropdown (fetched from Settings).
  * - Units: Smart Input (Type new or select existing).
  * - Features: Add, Edit, Restock, Use, History, Reports, Delete.
+ * - Update: Low Stock Filter functioning.
  */
 
 // --- BACKEND LOGIC ---
@@ -83,9 +84,7 @@ if (isset($_GET['delete'])) {
 }
 
 // --- FETCH DATA FOR DROPDOWNS ---
-// Categories: From Settings (Fixed List)
 $cats = $pdo->query("SELECT option_value FROM system_options WHERE option_type = 'stock_category' ORDER BY option_value ASC")->fetchAll(PDO::FETCH_COLUMN);
-// Units: From Stock Table (Self-Learning List)
 $units = $pdo->query("SELECT DISTINCT unit FROM stock WHERE unit != '' ORDER BY unit ASC")->fetchAll(PDO::FETCH_COLUMN);
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
@@ -284,11 +283,20 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php else:
-    // MAIN LIST (DEFAULT)
-    $items = $pdo->query("SELECT * FROM stock ORDER BY id DESC")->fetchAll();
+    // MAIN LIST (DEFAULT) - UPDATED FOR FILTERING
     $low_stock = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity < 10")->fetchColumn();
     $today = date('Y-m-d');
-    $act_today = $pdo->query("SELECT COUNT(*) FROM stock_logs WHERE DATE(log_date) = '$today'")->fetchColumn(); ?>
+    $act_today = $pdo->query("SELECT COUNT(*) FROM stock_logs WHERE DATE(log_date) = '$today'")->fetchColumn();
+
+    // FILTER LOGIC ADDED HERE
+    $filter_low = isset($_GET['filter']) && $_GET['filter'] == 'low';
+    $sql = "SELECT * FROM stock";
+    if ($filter_low) {
+        $sql .= " WHERE quantity <= 10";
+    }
+    $sql .= " ORDER BY id DESC";
+    $items = $pdo->query($sql)->fetchAll();
+    ?>
 
     <div class="metrics-grid">
         <a href="?page=stock&action=report" style="text-decoration:none;">
@@ -298,15 +306,22 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <div class="sub-text">Click for report</div>
             </div>
         </a>
-        <div class="metric-card" style="border-left:4px solid #FF9800;">
-            <h4>Low Stock</h4>
-            <div class="value" style="<?php echo ($low_stock > 0) ? 'color:#FF9800' : ''; ?>"><?php echo $low_stock; ?></div>
-            <div class="sub-text">Items need attention</div>
-        </div>
+        <a href="?page=stock&filter=low" style="text-decoration:none; color:inherit;">
+            <div class="metric-card" style="border-left:4px solid #FF9800; cursor:pointer;">
+                <h4>Low Stock</h4>
+                <div class="value" style="<?php echo ($low_stock > 0) ? 'color:#FF9800' : ''; ?>"><?php echo $low_stock; ?></div>
+                <div class="sub-text">Click to filter items</div>
+            </div>
+        </a>
     </div>
 
     <div class="list-header" style="display: flex; justify-content: space-between; align-items: center;">
-        <h2>📦 Stock Inventory</h2>
+        <h2>
+            📦 Stock Inventory
+            <?php if ($filter_low): ?>
+                <a href="?page=stock" style="font-size:0.8rem; color:#2196F3; text-decoration:none; margin-left:10px;">(Show All)</a>
+            <?php endif; ?>
+        </h2>
         <a href="?page=stock&action=add" style="background:#4CAF50; color:white; padding:8px 15px; text-decoration:none; border-radius:5px;">+ Add Item</a>
     </div>
 

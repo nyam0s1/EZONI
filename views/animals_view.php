@@ -3,6 +3,7 @@
  * ANIMALS VIEW
  * - Added: "Edit Animal" Mode for Admins.
  * - Features: Add, Manage Status, History, Edit.
+ * - Update: Intelligent Mother Filtering by Species.
  */
 
 // 1. REGISTER ANIMAL
@@ -56,15 +57,40 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <input type="text" name="tag_id" placeholder="Tag ID (e.g. COW-01)" required>
                 <input type="text" name="name" placeholder="Name" required>
                 <div style="display:flex; gap:10px;">
-                    <select name="species" style="flex:1; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
+                    <select name="species" id="species" style="flex:1; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
                         <?php foreach($species_list as $s) echo "<option value='$s'>$s</option>"; ?>
                     </select>
                     <select name="gender" style="flex:1; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;"><option value="Female">Female</option><option value="Male">Male</option></select>
                 </div>
-                <select name="mother_id" style="padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;"><option value="">-- Mother (Optional) --</option><?php foreach ($mothers as $m) echo "<option value='{$m['id']}'>{$m['name']}</option>"; ?></select>
+                <select name="mother_id" id="mother_id" style="padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
+                    <option value="">-- Mother (Optional) --</option>
+                    <?php foreach ($mothers as $m) echo "<option value='{$m['id']}' data-species='{$m['species']}'>{$m['name']} ({$m['species']})</option>"; ?>
+                </select>
                 <button type="submit" name="add_animal" style="background:#4CAF50;">Register</button>
             </form>
         </div>
+        <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const speciesSelect = document.getElementById('species');
+            const motherSelect = document.getElementById('mother_id');
+            const allMothers = Array.from(motherSelect.options);
+
+            function filterMothers() {
+                const selectedSpecies = speciesSelect.value;
+                motherSelect.innerHTML = ''; 
+                motherSelect.appendChild(allMothers[0]); // Keep "-- Mother (Optional) --"
+                
+                for (let i = 1; i < allMothers.length; i++) {
+                    const option = allMothers[i];
+                    if (option.getAttribute('data-species') === selectedSpecies) {
+                        motherSelect.appendChild(option);
+                    }
+                }
+            }
+            speciesSelect.addEventListener('change', filterMothers);
+            filterMothers(); // Run on load
+        });
+        </script>
     </div>
 
 <?php elseif ($action == 'edit' && isset($_GET['id'])): 
