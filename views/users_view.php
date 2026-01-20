@@ -1,10 +1,8 @@
 <?php
 /**
- * USERS MANAGEMENT VIEW
- * - Features: Add User, Toggle Status, Delete User.
- * - Security: 
- * 1. Admins cannot be suspended.
- * 2. Admins cannot be deleted here (Protected).
+ * USERS MANAGEMENT VIEW - SECURE VERSION
+ * - Features: Add User (w/ Toggle), Toggle Status, Secure Delete (w/ Password).
+ * - Security: Admins cannot be suspended. Deletion requires Admin Password.
  */
 
 // --- LOGIC ---
@@ -23,7 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_user'])) {
         echo "<script>alert('Error: Username already taken.');</script>";
     } else {
         $hashed = password_hash($password, PASSWORD_DEFAULT);
-        // Default status is 'active'
         $sql = "INSERT INTO users (username, password, role, status) VALUES (?, ?, ?, 'active')";
         $pdo->prepare($sql)->execute([$username, $hashed, $role]);
         echo "<script>window.location.href='?page=users';</script>";
@@ -50,27 +47,35 @@ if (isset($_GET['toggle_id']) && isset($_GET['new_status'])) {
     }
 }
 
-// 3. DELETE USER (Strict Security)
-if (isset($_GET['delete_user'])) {
-    $target_id = $_GET['delete_user'];
-    
-    // Get Target Role
+// 3. SECURE DELETE EXECUTION (New Logic)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_delete'])) {
+    $target_id = $_POST['target_id'];
+    $admin_pass = $_POST['admin_password'];
+    $admin_id = $_SESSION['user_id'];
+
+    // Get Target Data for validation
     $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
     $stmt->execute([$target_id]);
     $target_role = $stmt->fetchColumn();
 
-    // RULE 1: Cannot delete yourself (Use Sidebar option)
-    if ($target_id == $_SESSION['user_id']) {
-        echo "<script>alert('❌ Error: You cannot delete your own account here. Use the Delete Account option in the sidebar.'); window.location.href='?page=users';</script>";
-    } 
-    // RULE 2: ABSOLUTELY NO ADMIN DELETION ALLOWED HERE
-    elseif ($target_role == 'admin') {
-        echo "<script>alert('❌ Security: Administrators cannot be deleted by other users.'); window.location.href='?page=users';</script>";
-    } 
-    // RULE 3: Allowed to delete Standard Users
-    else {
-        $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$target_id]);
-        echo "<script>window.location.href='?page=users';</script>";
+    // 1. Verify Admin Password
+    $adm = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+    $adm->execute([$admin_id]);
+    $real_hash = $adm->fetchColumn();
+
+    if (password_verify($admin_pass, $real_hash)) {
+        // 2. Apply Security Rules
+        if ($target_id == $admin_id) {
+            echo "<script>alert('❌ Error: You cannot delete your own account here.'); window.location.href='?page=users';</script>";
+        } elseif ($target_role == 'admin') {
+            echo "<script>alert('❌ Security: Administrators cannot be deleted.'); window.location.href='?page=users';</script>";
+        } else {
+            // 3. Perform Delete
+            $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$target_id]);
+            echo "<script>alert('User deleted successfully.'); window.location.href='?page=users';</script>";
+        }
+    } else {
+        echo "<script>alert('❌ Error: Incorrect Admin Password. Deletion cancelled.');</script>";
     }
 }
 
@@ -105,7 +110,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <input type="text" name="username" placeholder="e.g. FarmManager" required autocomplete="off">
                 
                 <label style="color:#aaa;">Password</label>
-                <input type="password" name="password" placeholder="Secure Password" required autocomplete="new-password">
+                <div class="password-wrapper" style="margin-bottom:0;">
+                    <input type="password" name="password" placeholder="Secure Password" required autocomplete="new-password">
+                    <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
                 
                 <label style="color:#aaa;">Role / Access Level</label>
                 <select name="role" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555; padding:12px; border-radius:5px;">
@@ -114,6 +124,45 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 </select>
                 
                 <button type="submit" name="add_user" style="background:#4CAF50; margin-top:10px;">+ Create Account</button>
+            </form>
+        </div>
+    </div>
+
+<?php elseif ($action == 'confirm_delete'): ?>
+    <?php 
+        $del_id = $_GET['id']; 
+        $chk = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+        $chk->execute([$del_id]);
+        $del_name = $chk->fetchColumn();
+    ?>
+    <div class="form-container" style="max-width: 500px; margin-top:50px;">
+        <div class="form-header">
+            <a href="?page=users" class="back-btn"><i class="fas fa-arrow-left"></i> Cancel</a>
+            <h2 style="color:#ff4b4b;">⚠️ Delete User?</h2>
+        </div>
+        <div class="card" style="text-align:center; border-top: 3px solid #ff4b4b;">
+            <i class="fas fa-user-times" style="font-size:3rem; color:#ff4b4b; margin-bottom:20px;"></i>
+            
+            <p style="color:#ddd; margin-bottom:5px;">You are about to delete:</p>
+            <h3 style="color:#fff; margin-bottom:20px;"><?php echo htmlspecialchars($del_name); ?></h3>
+            
+            <p style="color:#aaa; font-size:0.9rem; margin-bottom:20px;">
+                To prevent accidents, please enter your <strong>Admin Password</strong> to confirm.
+            </p>
+            
+            <form method="POST">
+                <input type="hidden" name="target_id" value="<?php echo $del_id; ?>">
+                
+                <div class="password-wrapper" style="margin-bottom:20px; text-align:left;">
+                    <input type="password" name="admin_password" placeholder="Enter YOUR Admin Password" required style="border:1px solid #ff4b4b;">
+                    <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                
+                <button type="submit" name="confirm_secure_delete" style="background:#ff4b4b; width:100%; font-weight:bold;">
+                    <i class="fas fa-trash-alt"></i> Yes, Delete User
+                </button>
             </form>
         </div>
     </div>
@@ -194,7 +243,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                                         <a href="?page=users&toggle_id=<?php echo $u['id']; ?>&new_status=active" class="badge badge-green" style="text-decoration:none; margin-right:10px;">Activate ✅</a>
                                     <?php endif; ?>
 
-                                    <a href="?page=users&delete_user=<?php echo $u['id']; ?>" onclick="return confirm('Permanently delete this user?');" style="color:#ff4b4b;"><i class="fas fa-trash"></i></a>
+                                    <a href="?page=users&action=confirm_delete&id=<?php echo $u['id']; ?>" style="color:#ff4b4b;"><i class="fas fa-trash"></i></a>
                                 <?php endif; ?>
 
                             <?php else: ?>

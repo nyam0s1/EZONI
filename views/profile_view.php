@@ -2,7 +2,7 @@
 /**
  * PROFILE SETTINGS VIEW
  * ---------------------
- * Features: Update Username, Update Email, Change Password, Logout, Delete Account.
+ * Features: Update Username, Update Email, Change Password (with Toggle), Logout, Delete Account.
  * Security: Prevents duplicate usernames/emails.
  */
 
@@ -112,14 +112,30 @@ $current_user = $stmt->fetch();
         <div class="card" style="flex: 1; min-width: 300px;">
             <h3 style="border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; color: #4CAF50;">Security</h3>
             <form method="POST">
+                
                 <label style="color: #aaa; font-size: 0.9rem;">Current Password</label>
-                <input type="password" name="current_password" placeholder="Verify it's you" required style="margin-bottom: 15px;">
+                <div class="password-wrapper" style="margin-bottom: 15px;">
+                    <input type="password" name="current_password" placeholder="Verify it's you" required>
+                    <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
                 
                 <label style="color: #aaa; font-size: 0.9rem;">New Password</label>
-                <input type="password" name="new_password" placeholder="New strong password" required style="margin-bottom: 15px;">
+                <div class="password-wrapper" style="margin-bottom: 15px;">
+                    <input type="password" name="new_password" placeholder="New strong password" required>
+                    <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
                 
                 <label style="color: #aaa; font-size: 0.9rem;">Confirm New Password</label>
-                <input type="password" name="confirm_password" placeholder="Repeat password" required>
+                <div class="password-wrapper" style="margin-bottom: 0;">
+                    <input type="password" name="confirm_password" placeholder="Repeat password" required>
+                    <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
                 
                 <button type="submit" name="update_pass" class="badge-green" style="width: 100%; margin-top: 20px; border: none; padding: 12px; font-size: 1rem; cursor: pointer;">Change Password</button>
             </form>
