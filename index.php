@@ -22,6 +22,8 @@ if (isset($_SESSION['user_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EZONI Farm - Login</title>
     <link rel="stylesheet" href="CSS/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <link rel="manifest" href="manifest.json?v=3">
     <link rel="icon" type="image/png" href="images/logo.png">
     <link rel="apple-touch-icon" href="images/logo.png">
@@ -56,12 +58,14 @@ if (isset($_SESSION['user_id'])) {
         <form method="POST" action="auth_handler.php" style="display: flex; flex-direction: column; gap: 15px;">
             <input type="hidden" name="action" value="login">
             <input type="text" name="username" placeholder="Username or Email" required autocomplete="off">
+            
             <div class="password-wrapper" style="margin-bottom:20px;">
                 <input type="password" name="password" placeholder="Password" required>
                 <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
                     <i class="fas fa-eye"></i>
                 </button>
             </div>
+            
             <button type="submit" style="background-color: #4CAF50; font-size: 1rem;">Sign In</button>
         </form>
 
@@ -69,6 +73,22 @@ if (isset($_SESSION['user_id'])) {
             New here? <a href="register.php" style="color: #4CAF50; text-decoration: none;">Create Account</a>
         </p>
     </div>
-</body>
 
+    <script>
+        function togglePassword(btn) {
+            const input = btn.previousElementSibling;
+            const icon = btn.querySelector('i');
+            
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = "password";
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+    </script>
+</body>
 </html>
