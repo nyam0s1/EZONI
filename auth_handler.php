@@ -2,13 +2,12 @@
 session_start();
 require 'includes/db.php';
 
-// If someone tries to access this file directly without posting data
 if ($_SERVER["REQUEST_METHOD"] != "POST") {
     header("Location: index.php");
     exit();
 }
 
-$action = $_POST['action']; // 'login' or 'register'
+$action = $_POST['action'];
 
 // ==========================================
 // 1. LOGIN LOGIC
@@ -27,6 +26,13 @@ if ($action == 'login') {
         
         // CHECK 1: IS ACCOUNT SUSPENDED?
         if ($account['status'] === 'suspended') {
+            
+            // LOG THE ATTEMPT (The "Knock at the Door")
+            try {
+                $log = $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, 'Blocked Login Attempt', 'System')");
+                $log->execute([$account['id']]);
+            } catch (Exception $e) { /* Ignore logging errors to prevent crash */ }
+
             header("Location: index.php?error=Your account is suspended. Contact Admin.");
             exit();
         }
@@ -36,7 +42,6 @@ if ($action == 'login') {
         $_SESSION['username'] = $account['username'];
         $_SESSION['role'] = $account['role'];
 
-        // Redirect based on Role
         if ($account['role'] == 'admin') {
             header("Location: admin_dashboard.php");
         } else {
@@ -45,7 +50,6 @@ if ($action == 'login') {
         exit();
 
     } else {
-        // FAIL
         header("Location: index.php?error=Invalid Username or Password");
         exit();
     }
@@ -60,13 +64,11 @@ elseif ($action == 'register') {
     $password = $_POST['password'];
     $confirm = $_POST['confirm_password'];
 
-    // Validation
     if ($password !== $confirm) {
         header("Location: register.php?error=Passwords do not match");
         exit();
     }
 
-    // Check availability
     $check = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
     $check->execute([$username, $email]);
     
@@ -75,12 +77,15 @@ elseif ($action == 'register') {
         exit();
     }
 
-    // Create User (Default role: user, Default status: active)
     $hashed_pass = password_hash($password, PASSWORD_DEFAULT);
     $stmt = $pdo->prepare("INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, 'user', 'active')");
     
     if ($stmt->execute([$username, $email, $hashed_pass])) {
-        // Success: Send to Login Page
+        
+        // LOG THE NEW USER
+        $new_id = $pdo->lastInsertId();
+        $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, 'Account Created', 'Self-Register')")->execute([$new_id]);
+
         header("Location: index.php?registered=1");
         exit();
     } else {
