@@ -1,11 +1,19 @@
 <?php
 /**
- * USERS MANAGEMENT VIEW - SECURE VERSION
- * - Features: Add User (w/ Toggle), Toggle Status, Secure Delete (w/ Password).
- * - Security: Admins cannot be suspended. Deletion requires Admin Password.
+ * USERS MANAGEMENT VIEW - WITH HISTORY & LOGGING
+ * - Features: Add User, Toggle Status, Secure Delete, User History.
+ * - database: Uses 'user_logs' to track account lifecycle.
  */
 
-// --- LOGIC ---
+// --- LOGIC & LOGGING ---
+
+// HELPER: Log User Action
+function log_user_action($pdo, $target_id, $action) {
+    // We record WHO performed the action (The logged-in Admin)
+    $performer = $_SESSION['username']; 
+    $stmt = $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, ?, ?)");
+    $stmt->execute([$target_id, $action, $performer]);
+}
 
 // 1. ADD NEW USER
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_user'])) {
@@ -23,6 +31,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_user'])) {
         $hashed = password_hash($password, PASSWORD_DEFAULT);
         $sql = "INSERT INTO users (username, password, role, status) VALUES (?, ?, ?, 'active')";
         $pdo->prepare($sql)->execute([$username, $hashed, $role]);
+        
+        // LOG IT: Get the ID of the user we just made
+        $new_id = $pdo->lastInsertId();
+        log_user_action($pdo, $new_id, 'Account Created');
+        
         echo "<script>window.location.href='?page=users';</script>";
     }
 }
@@ -42,36 +55,41 @@ if (isset($_GET['toggle_id']) && isset($_GET['new_status'])) {
     } elseif ($target_role == 'admin') {
         echo "<script>alert('❌ Security Alert: Admins cannot be suspended.'); window.location.href='?page=users';</script>";
     } else {
+        // Update Status
         $pdo->prepare("UPDATE users SET status = ? WHERE id = ?")->execute([$status, $id]);
+        
+        // LOG IT: "Suspended" or "Activated"
+        $action_label = ($status == 'active') ? 'Account Activated' : 'Account Suspended';
+        log_user_action($pdo, $id, $action_label);
+        
         echo "<script>window.location.href='?page=users';</script>";
     }
 }
 
-// 3. SECURE DELETE EXECUTION (New Logic)
+// 3. SECURE DELETE EXECUTION
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_delete'])) {
     $target_id = $_POST['target_id'];
     $admin_pass = $_POST['admin_password'];
     $admin_id = $_SESSION['user_id'];
 
-    // Get Target Data for validation
     $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
     $stmt->execute([$target_id]);
     $target_role = $stmt->fetchColumn();
 
-    // 1. Verify Admin Password
     $adm = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $adm->execute([$admin_id]);
     $real_hash = $adm->fetchColumn();
 
     if (password_verify($admin_pass, $real_hash)) {
-        // 2. Apply Security Rules
         if ($target_id == $admin_id) {
             echo "<script>alert('❌ Error: You cannot delete your own account here.'); window.location.href='?page=users';</script>";
         } elseif ($target_role == 'admin') {
             echo "<script>alert('❌ Security: Administrators cannot be deleted.'); window.location.href='?page=users';</script>";
         } else {
-            // 3. Perform Delete
+            // Delete User and their logs
             $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$target_id]);
+            $pdo->prepare("DELETE FROM user_logs WHERE user_id = ?")->execute([$target_id]);
+            
             echo "<script>alert('User deleted successfully.'); window.location.href='?page=users';</script>";
         }
     } else {
@@ -81,7 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_delete'
 
 // 4. FILTER LOGIC
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
-
 if ($filter == 'active') {
     $users = $pdo->query("SELECT * FROM users WHERE status = 'active' ORDER BY id DESC")->fetchAll();
 } elseif ($filter == 'suspended') {
@@ -90,7 +107,7 @@ if ($filter == 'active') {
     $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
 }
 
-// 5. STATS COUNTS
+// 5. STATS
 $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
 $total_active = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'active'")->fetchColumn();
 $total_suspended = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'suspended'")->fetchColumn();
@@ -125,6 +142,68 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 
                 <button type="submit" name="add_user" style="background:#4CAF50; margin-top:10px;">+ Create Account</button>
             </form>
+        </div>
+    </div>
+
+<?php elseif ($action == 'history'): ?>
+    <?php 
+        $hist_id = $_GET['id'];
+        
+        // Get User Name
+        $u_stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+        $u_stmt->execute([$hist_id]);
+        $u_name = $u_stmt->fetchColumn();
+        
+        // Get Logs
+        $l_stmt = $pdo->prepare("SELECT * FROM user_logs WHERE user_id = ? ORDER BY log_date DESC");
+        $l_stmt->execute([$hist_id]);
+        $logs = $l_stmt->fetchAll();
+    ?>
+    <div class="form-container" style="max-width: 800px;">
+        <div class="form-header">
+            <a href="?page=users" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+            <h2>📜 History: <?php echo htmlspecialchars($u_name); ?></h2>
+        </div>
+
+        <div class="card" style="border-top: 3px solid #FF9800;">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Action</th>
+                            <th>Performed By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($logs as $log): ?>
+                        <tr>
+                            <td data-label="Date" style="color:#aaa;">
+                                <?php echo date('d M Y, H:i', strtotime($log['log_date'])); ?>
+                            </td>
+                            <td data-label="Action">
+                                <?php if(strpos($log['action_type'], 'Created') !== false): ?>
+                                    <span class="badge badge-blue">✨ Created</span>
+                                <?php elseif(strpos($log['action_type'], 'Suspended') !== false): ?>
+                                    <span class="badge badge-red">🚫 Suspended</span>
+                                <?php elseif(strpos($log['action_type'], 'Activated') !== false): ?>
+                                    <span class="badge badge-green">✅ Activated</span>
+                                <?php else: ?>
+                                    <span class="badge badge-orange"><?php echo $log['action_type']; ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td data-label="By">
+                                <span style="font-weight:bold; color:#fff;"><?php echo htmlspecialchars($log['performed_by']); ?></span>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        
+                        <?php if(empty($logs)): ?>
+                            <tr><td colspan="3" style="text-align:center; padding:30px; color:#666;">No history recorded yet.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -177,7 +256,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <div class="sub-text">All Accounts</div>
             </div>
         </a>
-        
         <a href="?page=users&filter=active" style="text-decoration:none;">
             <div class="metric-card" style="border-left:4px solid #4CAF50; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4>Active Users</h4>
@@ -185,7 +263,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <div class="sub-text">Can Login</div>
             </div>
         </a>
-        
         <a href="?page=users&filter=suspended" style="text-decoration:none;">
             <div class="metric-card" style="border-left:4px solid #ff4b4b; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4>Suspended</h4>
@@ -237,10 +314,14 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                                 <?php if($u['role'] == 'admin'): ?>
                                     <span class="badge" style="background:#333; color:#aaa; border:1px solid #555;">Protected 🛡️</span>
                                 <?php else: ?>
+                                    <a href="?page=users&action=history&id=<?php echo $u['id']; ?>" class="badge badge-orange" style="text-decoration:none; margin-right:5px; background:#555; border:1px solid #777;">
+                                        <i class="fas fa-clock"></i>
+                                    </a>
+
                                     <?php if($u['status'] == 'active'): ?>
-                                        <a href="?page=users&toggle_id=<?php echo $u['id']; ?>&new_status=suspended" class="badge badge-orange" style="text-decoration:none; margin-right:10px;">Suspend 🚫</a>
+                                        <a href="?page=users&toggle_id=<?php echo $u['id']; ?>&new_status=suspended" class="badge badge-orange" style="text-decoration:none; margin-right:5px;">Suspend 🚫</a>
                                     <?php else: ?>
-                                        <a href="?page=users&toggle_id=<?php echo $u['id']; ?>&new_status=active" class="badge badge-green" style="text-decoration:none; margin-right:10px;">Activate ✅</a>
+                                        <a href="?page=users&toggle_id=<?php echo $u['id']; ?>&new_status=active" class="badge badge-green" style="text-decoration:none; margin-right:5px;">Activate ✅</a>
                                     <?php endif; ?>
 
                                     <a href="?page=users&action=confirm_delete&id=<?php echo $u['id']; ?>" style="color:#ff4b4b;"><i class="fas fa-trash"></i></a>
