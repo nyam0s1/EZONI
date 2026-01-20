@@ -56,7 +56,12 @@ if (isset($_SESSION['user_id'])) {
         <form method="POST" action="auth_handler.php" style="display: flex; flex-direction: column; gap: 15px;">
             <input type="hidden" name="action" value="login">
             <input type="text" name="username" placeholder="Username or Email" required autocomplete="off">
-            <input type="password" name="password" placeholder="Password" required>
+            <div class="password-wrapper" style="margin-bottom:20px;">
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
             <button type="submit" style="background-color: #4CAF50; font-size: 1rem;">Sign In</button>
         </form>
 

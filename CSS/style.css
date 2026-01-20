@@ -685,3 +685,38 @@ button {
         width: 100% !important;
     }
 }
+
+/* =========================================
+   8. PASSWORD TOGGLE (View/Hide)
+   ========================================= */
+.password-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex; /* Ensures alignment */
+    align-items: center;
+}
+
+.password-wrapper input {
+    width: 100%;
+    padding-right: 40px !important; /* Make room for the eye */
+    margin-bottom: 0 !important; /* Wrapper handles spacing */
+}
+
+.toggle-password-btn {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 5px;
+    z-index: 10;
+    min-width: auto !important; /* Override global button styles */
+    margin-top: 0 !important;   /* Override form button spacing */
+}
+
+.toggle-password-btn:hover {
+    color: #fff;
+    transform: none !important; /* Stop it from jumping */
+}
