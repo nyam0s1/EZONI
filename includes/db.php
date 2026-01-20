@@ -1,9 +1,9 @@
 <?php
 // Production Database Connection
-$host = 'localhost';
-$dbname = 'ezoni_farm';
-$username = 'root';      // CHANGE THIS on live server
-$password = '';          // CHANGE THIS on live server
+$host = "localhost";
+$dbname = "ezoni_farm";
+$username = "root";
+$password = "";
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
