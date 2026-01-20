@@ -1,9 +1,10 @@
 <?php
 /**
- * ADMIN OVERVIEW VIEW
- * -------------------
- * Displays key metrics: Revenue, Low Stock (Combined), Livestock, Users.
- * ALL cards are now clickable shortcuts.
+ * ADMIN OVERVIEW VIEW - DYNAMIC ALERTS VERSION
+ * - Update: "Low Stock" count now respects ALL custom thresholds:
+ * 1. Inventory (quantity <= min_threshold)
+ * 2. Produce (quantity <= min_threshold)
+ * 3. Livestock (count < species_limit)
  */
 
 // 1. CALCULATE METRICS
@@ -15,10 +16,25 @@ try {
     $stmt->execute([$today]); 
     $rev = $stmt->fetchColumn() ?: 0;
     
-    // Low Stock (Inventory + Produce)
-    $stock_low = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity < 10")->fetchColumn() ?: 0;
-    $prod_low = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity < 10")->fetchColumn() ?: 0;
-    $total_alerts = $stock_low + $prod_low;
+    // Low Stock (Inventory + Produce) - DYNAMIC CHECK
+    $stock_low = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
+    $prod_low = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
+    
+    // Low Stock (Livestock) - DYNAMIC CHECK against species_limits
+    // Query: Count animals by species, compare against limit
+    $sql_animal_alerts = "
+        SELECT COUNT(*) FROM (
+            SELECT a.species, COUNT(*) as qty, l.min_threshold 
+            FROM animals a 
+            JOIN species_limits l ON a.species = l.species 
+            WHERE a.status='Active' 
+            GROUP BY a.species 
+            HAVING qty <= l.min_threshold
+        ) as alerts
+    ";
+    $animal_low = $pdo->query($sql_animal_alerts)->fetchColumn() ?: 0;
+    
+    $total_alerts = $stock_low + $prod_low + $animal_low;
     
     // Active Animals
     $animals = $pdo->query("SELECT COUNT(*) FROM animals WHERE status='Active'")->fetchColumn() ?: 0;

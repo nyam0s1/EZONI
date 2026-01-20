@@ -21,7 +21,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ezoni Farm - Admin</title>
-    <link rel="stylesheet" href="/CSS/style.css">
+    <link rel="stylesheet" href="CSS/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="manifest" href="manifest.json">
@@ -88,10 +88,34 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
         elseif ($page == 'settings') { include 'views/settings_view.php'; }
         
         elseif ($page == 'alerts') {
-            $stock_alerts = $pdo->query("SELECT id, name, quantity, unit, 'Inventory' as type FROM stock WHERE quantity < 10")->fetchAll(PDO::FETCH_ASSOC);
-            $produce_alerts = $pdo->query("SELECT id, name, quantity, unit, 'Produce' as type FROM produce WHERE quantity < 10")->fetchAll(PDO::FETCH_ASSOC);
-            $animal_alerts = $pdo->query("SELECT NULL as id, species as name, COUNT(*) as quantity, 'Heads' as unit, 'Livestock' as type FROM animals WHERE status='Active' GROUP BY species HAVING quantity < 5")->fetchAll(PDO::FETCH_ASSOC);
-            $all_alerts = array_merge($stock_alerts, $produce_alerts, $animal_alerts);
+            try {
+                // 1. Inventory (Dynamic Threshold)
+                $stock_alerts = $pdo->query("SELECT id, name, quantity, unit, 'Inventory' as type FROM stock WHERE quantity <= min_threshold")->fetchAll(PDO::FETCH_ASSOC);
+                
+                // 2. Produce (Dynamic Threshold)
+                $produce_alerts = $pdo->query("SELECT id, name, quantity, unit, 'Produce' as type FROM produce WHERE quantity <= min_threshold")->fetchAll(PDO::FETCH_ASSOC);
+                
+                // 3. Livestock (Strict Mode Compliant Query)
+                // We now GROUP BY both species AND min_threshold to satisfy strict SQL rules.
+                $sql_animal = "
+                    SELECT NULL as id, a.species as name, COUNT(*) as quantity, 'Heads' as unit, 'Livestock' as type 
+                    FROM animals a 
+                    JOIN species_limits l ON a.species = l.species 
+                    WHERE a.status='Active' 
+                    GROUP BY a.species, l.min_threshold 
+                    HAVING quantity <= l.min_threshold";
+                $animal_alerts = $pdo->query($sql_animal)->fetchAll(PDO::FETCH_ASSOC);
+                
+                $all_alerts = array_merge($stock_alerts, $produce_alerts, $animal_alerts);
+
+            } catch (Exception $e) {
+                // This will show the error instead of a white screen if something is still wrong
+                echo "<div class='card' style='border-top:3px solid #ff4b4b; color:#ff4b4b;'>
+                        <h3>⚠️ System Error</h3>
+                        <p><strong>Technical Error:</strong> " . $e->getMessage() . "</p>
+                      </div>";
+                $all_alerts = [];
+            }
             ?>
             <div class="form-container" style="max-width:900px;">
                 <div class="form-header"><a href="?page=overview" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>⚠️ Low Stock Report</h2></div>
@@ -108,7 +132,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
                         </td>
                     </tr>
                     <?php endforeach; ?>
-                    <?php if(empty($all_alerts)) echo "<tr><td colspan='4' style='text-align:center; padding:30px; color:#aaa;'>No low stock items found. Great job! 🎉</td></tr>"; ?>
+                    <?php if(empty($all_alerts) && !isset($e)) echo "<tr><td colspan='4' style='text-align:center; padding:30px; color:#aaa;'>No low stock items found. Great job! 🎉</td></tr>"; ?>
                 </tbody></table></div></div>
             </div>
             <?php

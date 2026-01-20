@@ -1,9 +1,9 @@
 <?php
 /**
- * SALES & PRODUCTION VIEW - FULL VERSION
- * - Categories: Strict Dropdown (Fetched from Settings).
- * - Units: Smart Input (Type new or select existing).
- * - Features: Add, Edit, Harvest, Sell, History, Reports.
+ * SALES & PRODUCTION VIEW - DYNAMIC THRESHOLD VERSION
+ * - Update: "Low Stock" uses the specific 'min_threshold'.
+ * - Added: Input field for threshold in Add/Edit forms.
+ * - Added: Low Stock Filter functionality.
  */
 
 // --- BACKEND LOGIC ---
@@ -11,8 +11,11 @@
 // 1. CREATE NEW PRODUCT
 if ($_SERVER['REQUEST_METHOD']=='POST' && isset($_POST['add_product'])) {
     $price = floatval($_POST['price']);
-    $stmt = $pdo->prepare("INSERT INTO produce (name, quantity, unit, category, default_price) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $price]);
+    // Default threshold to 10 if empty
+    $threshold = !empty($_POST['min_threshold']) ? intval($_POST['min_threshold']) : 10;
+    
+    $stmt = $pdo->prepare("INSERT INTO produce (name, quantity, unit, category, default_price, min_threshold) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $price, $threshold]);
     
     // Log creation
     $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit_price, total_revenue, user) VALUES (?, 'Created', ?, ?, 0, ?)")
@@ -28,52 +31,41 @@ if ($_SERVER['REQUEST_METHOD']=='POST' && isset($_POST['edit_product']) && $_SES
     $unit = $_POST['unit'];
     $price = floatval($_POST['price']);
     $category = $_POST['category'];
+    $threshold = intval($_POST['min_threshold']);
     
-    $pdo->prepare("UPDATE produce SET name = ?, unit = ?, default_price = ?, category = ? WHERE id = ?")
-        ->execute([$name, $unit, $price, $category, $id]);
+    $pdo->prepare("UPDATE produce SET name = ?, unit = ?, default_price = ?, category = ?, min_threshold = ? WHERE id = ?")
+        ->execute([$name, $unit, $price, $category, $threshold, $id]);
         
     echo "<script>window.location.href='?page=sales';</script>";
 }
 
-// 3. HARVEST (Add Stock)
+// 3. HARVEST (Standard)
 if ($_SERVER['REQUEST_METHOD']=='POST' && isset($_POST['submit_harvest'])) {
     $qty = floatval($_POST['quantity']);
     if ($qty > 0) {
-        // Update Stock
         $pdo->prepare("UPDATE produce SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-        
-        // Log Harvest
         $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit_price, total_revenue, customer_name, user) VALUES (?, 'Harvest', ?, 0, 0, '-', ?)")
             ->execute([$_POST['name'], $qty, $_SESSION['username']]);
-            
         echo "<script>window.location.href='?page=sales';</script>";
     }
 }
 
-// 4. SELL (Deduct Stock)
+// 4. SELL (Standard)
 if ($_SERVER['REQUEST_METHOD']=='POST' && isset($_POST['submit_sale'])) {
     $qty = floatval($_POST['quantity']); 
     $price = floatval($_POST['price']); 
     $total = $qty * $price;
     $customer = !empty($_POST['customer']) ? $_POST['customer'] : 'Walk-in';
     
-    // Check Stock
     $stmt = $pdo->prepare("SELECT quantity FROM produce WHERE id = ?"); 
     $stmt->execute([$_POST['id']]); 
     $current_stock = $stmt->fetchColumn();
 
     if ($qty > 0 && $current_stock >= $qty) {
-        // Update Produce
         $pdo->prepare("UPDATE produce SET quantity = quantity - ?, default_price = ? WHERE id = ?")->execute([$qty, $price, $_POST['id']]);
-        
-        // Log Sale
-        $sql = "INSERT INTO sales_logs (product_name, action_type, quantity, unit_price, total_revenue, customer_name, user) VALUES (?, 'Sold', ?, ?, ?, ?, ?)";
-        $pdo->prepare($sql)->execute([$_POST['name'], $qty, $price, $total, $customer, $_SESSION['username']]);
-        
+        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit_price, total_revenue, customer_name, user) VALUES (?, 'Sold', ?, ?, ?, ?, ?)")->execute([$_POST['name'], $qty, $price, $total, $customer, $_SESSION['username']]);
         echo "<script>window.location.href='?page=sales';</script>";
-    } else { 
-        echo "<script>alert('Error: Not enough stock!');</script>"; 
-    }
+    } else { echo "<script>alert('Error: Not enough stock!');</script>"; }
 }
 
 // 5. DELETE
@@ -82,10 +74,8 @@ if (isset($_GET['delete'])) {
     echo "<script>window.location.href='?page=sales';</script>";
 }
 
-// --- FETCH DATA FOR DROPDOWNS ---
-// Categories: From Settings (Strict)
+// --- FETCH DATA ---
 $cats = $pdo->query("SELECT option_value FROM system_options WHERE option_type = 'produce_category' ORDER BY option_value ASC")->fetchAll(PDO::FETCH_COLUMN);
-// Units: From Produce Table (Smart/Self-Learning)
 $units = $pdo->query("SELECT DISTINCT unit FROM produce WHERE unit != '' ORDER BY unit ASC")->fetchAll(PDO::FETCH_COLUMN);
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
@@ -107,7 +97,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1;">
-                        <label style="color:#aaa;">Unit (Type or Select)</label>
+                        <label style="color:#aaa;">Unit</label>
                         <input type="text" name="unit" list="prod_units" value="<?php echo $is_edit?$p['unit']:''; ?>" placeholder="e.g. Kg" required>
                         <datalist id="prod_units">
                             <?php foreach($units as $u) echo "<option value='$u'>"; ?>
@@ -117,6 +107,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <label style="color:#aaa;">Default Price</label>
                         <input type="number" step="0.01" name="price" value="<?php echo $is_edit?$p['default_price']:''; ?>" placeholder="Price" required>
                     </div>
+                </div>
+
+                <div style="flex:1;">
+                    <label style="color:#aaa;">Low Stock Warning Level</label>
+                    <input type="number" name="min_threshold" value="<?php echo $is_edit ? $p['min_threshold'] : '10'; ?>" placeholder="Alert me when below..." required>
+                    <small style="color:#666;">Default is 10. Change this to customize alerts.</small>
                 </div>
 
                 <label style="color:#aaa;">Category</label>
@@ -140,7 +136,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'harvest' && isset($_GET['id'])): 
-    // HARVEST FORM
+    // HARVEST FORM (Standard)
     $p = $pdo->query("SELECT * FROM produce WHERE id=".$_GET['id'])->fetch(); ?>
     <div class="form-container">
         <div class="form-header"><a href="?page=sales" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>Record Harvest</h2></div>
@@ -158,7 +154,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'sell' && isset($_GET['id'])): 
-    // SELL FORM
+    // SELL FORM (Standard)
     $p = $pdo->query("SELECT * FROM produce WHERE id=".$_GET['id'])->fetch(); ?>
     <div class="form-container">
         <div class="form-header"><a href="?page=sales" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>Record Sale</h2></div>
@@ -170,7 +166,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
             <form method="POST">
                 <input type="hidden" name="id" value="<?php echo $p['id']; ?>">
                 <input type="hidden" name="name" value="<?php echo $p['name']; ?>">
-                
                 <div style="display:flex; gap:15px; margin-bottom:15px;">
                     <div style="flex:1;">
                         <label style="display:block; margin-bottom:5px; color:#ccc;">Quantity</label>
@@ -181,13 +176,10 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <input type="number" step="0.01" name="price" id="price" value="<?php echo $p['default_price']; ?>" required oninput="calcTotal()">
                     </div>
                 </div>
-                
                 <input type="text" name="customer" placeholder="Customer Name (Optional)" style="margin-bottom:20px;">
-                
                 <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:5px; margin-bottom:20px; text-align:center;">
                     <span style="color:#aaa;">Total:</span> <strong style="color:#4CAF50; font-size:1.5rem;">Ksh <span id="total">0.00</span></strong>
                 </div>
-                
                 <button type="submit" name="submit_sale" style="background:#4CAF50; width:100%;">$ Confirm Sale</button>
             </form>
         </div>
@@ -195,14 +187,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'revenue_report'): 
-    // REVENUE REPORT
+    // REVENUE REPORT (Standard)
     $today = date('Y-m-d'); 
     $sales = $pdo->prepare("SELECT * FROM sales_logs WHERE action_type = 'Sold' AND DATE(log_date) = ? ORDER BY id DESC"); 
     $sales->execute([$today]); 
     $records = $sales->fetchAll(); 
-    $day_total = 0; 
-    foreach($records as $r) $day_total += $r['total_revenue']; ?>
-    
+    $day_total = 0; foreach($records as $r) $day_total += $r['total_revenue']; ?>
     <div class="form-container" style="max-width:800px;">
         <div class="form-header"><a href="?page=sales" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>Sales Report: Today</h2></div>
         <div class="card" style="text-align:left;">
@@ -215,14 +205,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th>Customer</th></tr></thead>
                     <tbody>
                         <?php foreach ($records as $r): ?>
-                        <tr>
-                            <td data-label="Date" style="color:#888;"><?php echo date('d M Y, H:i', strtotime($r['log_date'])); ?></td>
-                            <td data-label="Item"><?php echo $r['product_name']; ?></td>
-                            <td data-label="Qty"><?php echo $r['quantity']; ?></td>
-                            <td data-label="Price"><?php echo $r['unit_price']; ?></td>
-                            <td data-label="Total" style="color:#4CAF50; font-weight:bold;"><?php echo $r['total_revenue']; ?></td>
-                            <td data-label="Customer"><?php echo $r['customer_name']; ?></td>
-                        </tr>
+                        <tr><td data-label="Date" style="color:#888;"><?php echo date('d M Y, H:i', strtotime($r['log_date'])); ?></td><td data-label="Item"><?php echo $r['product_name']; ?></td><td data-label="Qty"><?php echo $r['quantity']; ?></td><td data-label="Price"><?php echo $r['unit_price']; ?></td><td data-label="Total" style="color:#4CAF50; font-weight:bold;"><?php echo $r['total_revenue']; ?></td><td data-label="Customer"><?php echo $r['customer_name']; ?></td></tr>
                         <?php endforeach; ?>
                         <?php if(empty($records)) echo "<tr><td colspan='6' style='text-align:center; padding:20px;'>No sales yet today.</td></tr>"; ?>
                     </tbody>
@@ -232,14 +215,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'harvest_report'): 
-    // HARVEST REPORT
+    // HARVEST REPORT (Standard)
     $today = date('Y-m-d'); 
     $harvests = $pdo->prepare("SELECT * FROM sales_logs WHERE action_type = 'Harvest' AND DATE(log_date) = ? ORDER BY id DESC"); 
     $harvests->execute([$today]); 
     $records = $harvests->fetchAll(); 
-    $day_qty = 0; 
-    foreach($records as $r) $day_qty += $r['quantity']; ?>
-    
+    $day_qty = 0; foreach($records as $r) $day_qty += $r['quantity']; ?>
     <div class="form-container" style="max-width:800px;">
         <div class="form-header"><a href="?page=sales" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>Production Report: Today</h2></div>
         <div class="card" style="text-align:left; border-top: 3px solid #2196F3;">
@@ -252,12 +233,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <thead><tr><th>Date</th><th>Item</th><th>Quantity</th><th>User</th></tr></thead>
                     <tbody>
                         <?php foreach ($records as $r): ?>
-                        <tr>
-                            <td data-label="Date" style="color:#888;"><?php echo date('d M Y, H:i', strtotime($r['log_date'])); ?></td>
-                            <td data-label="Item"><?php echo $r['product_name']; ?></td>
-                            <td data-label="Quantity" style="font-weight:bold; color:#2196F3;"><?php echo $r['quantity']; ?></td>
-                            <td data-label="User"><?php echo $r['user']; ?></td>
-                        </tr>
+                        <tr><td data-label="Date" style="color:#888;"><?php echo date('d M Y, H:i', strtotime($r['log_date'])); ?></td><td data-label="Item"><?php echo $r['product_name']; ?></td><td data-label="Quantity" style="font-weight:bold; color:#2196F3;"><?php echo $r['quantity']; ?></td><td data-label="User"><?php echo $r['user']; ?></td></tr>
                         <?php endforeach; ?>
                         <?php if(empty($records)) echo "<tr><td colspan='4' style='text-align:center; padding:20px;'>No harvest recorded today.</td></tr>"; ?>
                     </tbody>
@@ -267,10 +243,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'history' && isset($_GET['id'])): 
-    // HISTORY VIEW
+    // HISTORY VIEW (Standard)
     $n = $pdo->prepare("SELECT name FROM produce WHERE id = ?"); $n->execute([$_GET['id']]); $name = $n->fetchColumn();
     $logs = $pdo->prepare("SELECT * FROM sales_logs WHERE product_name = ? ORDER BY id DESC"); $logs->execute([$name]); $history = $logs->fetchAll(); ?>
-    
     <div class="form-container" style="max-width:800px;">
         <div class="form-header"><a href="?page=sales" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>History: <?php echo $name; ?></h2></div>
         <div class="card" style="text-align:left;">
@@ -279,14 +254,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <thead><tr><th>Date</th><th>Action</th><th>Qty</th><th>Price</th><th>Total</th><th>Customer</th></tr></thead>
                     <tbody>
                         <?php foreach ($history as $h): ?>
-                        <tr>
-                            <td data-label="Date" style="color:#888; font-size:0.85rem;"><?php echo date('d M Y, H:i', strtotime($h['log_date'])); ?></td>
-                            <td data-label="Action"><span class="badge <?php echo ($h['action_type']=='Sold')?'badge-green':(($h['action_type']=='Harvest')?'badge-blue':''); ?>"><?php echo $h['action_type']; ?></span></td>
-                            <td data-label="Qty"><strong><?php echo $h['quantity']; ?></strong></td>
-                            <td data-label="Price"><?php echo ($h['unit_price']>0)?$h['unit_price']:'-'; ?></td>
-                            <td data-label="Total"><?php echo ($h['total_revenue']>0)?'<span style="color:#4CAF50">'.$h['total_revenue'].'</span>':'-'; ?></td>
-                            <td data-label="Customer" style="color:#ccc;"><?php echo ($h['customer_name'] == '-') ? '' : $h['customer_name']; ?></td>
-                        </tr>
+                        <tr><td data-label="Date" style="color:#888; font-size:0.85rem;"><?php echo date('d M Y, H:i', strtotime($h['log_date'])); ?></td><td data-label="Action"><span class="badge <?php echo ($h['action_type']=='Sold')?'badge-green':(($h['action_type']=='Harvest')?'badge-blue':''); ?>"><?php echo $h['action_type']; ?></span></td><td data-label="Qty"><strong><?php echo $h['quantity']; ?></strong></td><td data-label="Price"><?php echo ($h['unit_price']>0)?$h['unit_price']:'-'; ?></td><td data-label="Total"><?php echo ($h['total_revenue']>0)?'<span style="color:#4CAF50">'.$h['total_revenue'].'</span>':'-'; ?></td><td data-label="Customer" style="color:#ccc;"><?php echo ($h['customer_name'] == '-') ? '' : $h['customer_name']; ?></td></tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -295,11 +263,19 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php else: 
-    // MAIN LIST (DEFAULT VIEW)
+    // MAIN LIST - UPDATED FOR DYNAMIC ALERTS
+    $low_prod = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity <= min_threshold")->fetchColumn();
+    
     $today = date('Y-m-d'); 
     $revenue = $pdo->prepare("SELECT SUM(total_revenue) FROM sales_logs WHERE DATE(log_date) = ?"); $revenue->execute([$today]); $rev_today = $revenue->fetchColumn() ?: 0;
     $harvest = $pdo->prepare("SELECT SUM(quantity) FROM sales_logs WHERE action_type='Harvest' AND DATE(log_date) = ?"); $harvest->execute([$today]); $har_today = $harvest->fetchColumn() ?: 0;
-    $products = $pdo->query("SELECT * FROM produce ORDER BY id DESC")->fetchAll(); ?>
+
+    // Filter Logic
+    $filter_low = isset($_GET['filter']) && $_GET['filter'] == 'low';
+    $sql = "SELECT * FROM produce";
+    if ($filter_low) $sql .= " WHERE quantity <= min_threshold";
+    $sql .= " ORDER BY id DESC";
+    $products = $pdo->query($sql)->fetchAll(); ?>
     
     <div class="metrics-grid">
         <a href="?page=sales&action=revenue_report" style="text-decoration:none;">
@@ -309,6 +285,15 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <div class="sub-text">Click for details</div>
             </div>
         </a>
+        
+        <a href="?page=sales&filter=low" style="text-decoration:none;">
+            <div class="metric-card" style="border-left:4px solid #FF9800; cursor:pointer;">
+                <h4>Low Stock</h4>
+                <div class="value" style="<?php echo ($low_prod > 0) ? 'color:#FF9800' : ''; ?>"><?php echo $low_prod; ?></div>
+                <div class="sub-text">Items needing attention</div>
+            </div>
+        </a>
+
         <a href="?page=sales&action=harvest_report" style="text-decoration:none;">
             <div class="metric-card" style="border-left:4px solid #2196F3;">
                 <h4>Harvest Today</h4>
@@ -319,7 +304,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
     <div class="list-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2>💰 Produce & Sales</h2>
+        <h2>
+            💰 Produce & Sales
+            <?php if ($filter_low): ?>
+                <a href="?page=sales" style="font-size:0.8rem; color:#2196F3; text-decoration:none; margin-left:10px;">(Show All)</a>
+            <?php endif; ?>
+        </h2>
         <a href="?page=sales&action=add" style="background:#4CAF50; color:white; padding:8px 15px; text-decoration:none; border-radius:5px;">+ New Product</a>
     </div>
     
@@ -333,7 +323,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <td data-label="Name"><?php echo $p['name']; ?></td>
                         <td data-label="Stock">
                             <div style="text-align:right;">
-                                <span style="color:#fff; font-weight:bold; font-size:1.1rem;"><?php echo $p['quantity']; ?></span> 
+                                <span style="font-weight:bold; font-size:1.1rem; color:<?php echo ($p['quantity'] <= $p['min_threshold']) ? '#FF9800' : '#fff'; ?>;">
+                                    <?php echo $p['quantity']; ?>
+                                </span> 
                                 <small style="color:#888;"><?php echo $p['unit']; ?></small>
                             </div>
                         </td>
@@ -343,10 +335,8 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                             <?php if($_SESSION['role'] == 'admin'): ?>
                                 <a href="?page=sales&action=edit&id=<?php echo $p['id']; ?>" class="badge badge-blue" style="text-decoration:none; margin-right:5px;">Edit ✏️</a>
                             <?php endif; ?>
-                            
                             <a href="?page=sales&action=harvest&id=<?php echo $p['id']; ?>" class="badge badge-blue" style="text-decoration:none; margin-right:5px;">Harvest 🌾</a>
                             <a href="?page=sales&action=sell&id=<?php echo $p['id']; ?>" class="badge badge-green" style="text-decoration:none; margin-right:10px;">Sell 💰</a>
-                            
                             <a href="?page=sales&action=history&id=<?php echo $p['id']; ?>" style="color:#ccc; margin-right:10px;" title="History"><i class="fas fa-history"></i></a>
                             <a href="?page=sales&delete=<?php echo $p['id']; ?>" onclick="return confirm('Delete?')" style="color:#ff4b4b;"><i class="fas fa-trash"></i></a>
                         </td>
@@ -356,5 +346,4 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
             </table>
         </div>
     </div>
-
 <?php endif; ?>

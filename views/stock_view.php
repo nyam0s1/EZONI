@@ -1,21 +1,20 @@
 <?php
-
 /**
- * STOCK VIEW - FULL VERSION
- * - Categories: Strict Dropdown (fetched from Settings).
- * - Units: Smart Input (Type new or select existing).
- * - Features: Add, Edit, Restock, Use, History, Reports, Delete.
- * - Update: Low Stock Filter functioning.
+ * STOCK VIEW - DYNAMIC THRESHOLD VERSION
+ * - Update: "Low Stock" uses the specific 'min_threshold' of each item.
+ * - Added: Input field for threshold in Add/Edit forms.
  */
 
 // --- BACKEND LOGIC ---
 
 // 1. ADD NEW ITEM
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_stock'])) {
-    $stmt = $pdo->prepare("INSERT INTO stock (name, quantity, unit, category) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category']]);
+    // Default threshold to 10 if left empty
+    $threshold = !empty($_POST['min_threshold']) ? intval($_POST['min_threshold']) : 10;
+    
+    $stmt = $pdo->prepare("INSERT INTO stock (name, quantity, unit, category, min_threshold) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $threshold]);
 
-    // Log Creation
     $id = $pdo->lastInsertId();
     $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, user) VALUES (?, ?, 'Created', ?, ?, ?)")
         ->execute([$id, $_POST['name'], $_POST['quantity'], $_POST['unit'], $_SESSION['username']]);
@@ -29,9 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_stock']) && $_SES
     $name = $_POST['name'];
     $category = $_POST['category'];
     $unit = $_POST['unit'];
+    $threshold = intval($_POST['min_threshold']);
 
-    $pdo->prepare("UPDATE stock SET name = ?, category = ?, unit = ? WHERE id = ?")
-        ->execute([$name, $category, $unit, $id]);
+    $pdo->prepare("UPDATE stock SET name = ?, category = ?, unit = ?, min_threshold = ? WHERE id = ?")
+        ->execute([$name, $category, $unit, $threshold, $id]);
 
     echo "<script>window.location.href='?page=stock';</script>";
 }
@@ -43,10 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_restock'])) {
     $total = $qty * $cost;
 
     if ($qty > 0) {
-        // Update Quantity
         $pdo->prepare("UPDATE stock SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-
-        // Log Transaction
         $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, user) VALUES (?, ?, 'Restocked', ?, ?, ?, ?, ?)")
             ->execute([$_POST['id'], $_POST['name'], $qty, $_POST['unit'], $cost, $total, $_SESSION['username']]);
 
@@ -57,17 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_restock'])) {
 // 4. USE (Red Action)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_use'])) {
     $qty = floatval($_POST['quantity']);
-
-    // Check current stock first
     $stmt = $pdo->prepare("SELECT quantity FROM stock WHERE id = ?");
     $stmt->execute([$_POST['id']]);
     $curr = $stmt->fetchColumn();
 
     if ($qty > 0 && $curr >= $qty) {
-        // Deduct Quantity
         $pdo->prepare("UPDATE stock SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-
-        // Log Usage
         $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, user) VALUES (?, ?, 'Used', ?, ?, ?)")
             ->execute([$_POST['id'], $_POST['name'], $qty, $_POST['unit'], $_SESSION['username']]);
 
@@ -120,6 +112,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     </div>
                 </div>
 
+                <div style="flex:1;">
+                    <label style="color:#aaa;">Low Stock Warning Level</label>
+                    <input type="number" name="min_threshold" value="<?php echo $is_edit ? $item['min_threshold'] : '10'; ?>" placeholder="Alert me when below..." required>
+                    <small style="color:#666;">Default is 10. Change this to customize alerts.</small>
+                </div>
+
                 <label style="color:#aaa;">Category</label>
                 <select name="category" required style="padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
                     <option value="">-- Select Category --</option>
@@ -134,7 +132,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'restock' && isset($_GET['id'])):
-    // RESTOCK FORM
+    // RESTOCK FORM (Standard)
     $i = $pdo->prepare("SELECT * FROM stock WHERE id = ?");
     $i->execute([$_GET['id']]);
     $item = $i->fetch(); ?>
@@ -160,23 +158,17 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <input type="number" step="0.01" name="cost" id="cost" placeholder="0.00" oninput="calcCost()">
                     </div>
                 </div>
-
                 <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:5px; margin-bottom:20px; text-align:center;">
                     <span style="color:#aaa;">Total Expense:</span> <strong style="color:#ff4b4b; font-size:1.5rem;">Ksh <span id="total">0.00</span></strong>
                 </div>
-
                 <button type="submit" name="submit_restock" style="background:#4CAF50; width:100%;">+ Confirm Restock</button>
             </form>
         </div>
-        <script>
-            function calcCost() {
-                document.getElementById('total').innerText = ((document.getElementById('qty').value || 0) * (document.getElementById('cost').value || 0)).toFixed(2);
-            }
-        </script>
+        <script>function calcCost() { document.getElementById('total').innerText = ((document.getElementById('qty').value || 0) * (document.getElementById('cost').value || 0)).toFixed(2); }</script>
     </div>
 
 <?php elseif ($action == 'use' && isset($_GET['id'])):
-    // USE FORM
+    // USE FORM (Standard)
     $i = $pdo->prepare("SELECT * FROM stock WHERE id = ?");
     $i->execute([$_GET['id']]);
     $item = $i->fetch(); ?>
@@ -192,10 +184,8 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <input type="hidden" name="id" value="<?php echo $item['id']; ?>">
                 <input type="hidden" name="name" value="<?php echo $item['name']; ?>">
                 <input type="hidden" name="unit" value="<?php echo $item['unit']; ?>">
-
                 <label style="display:block; margin-bottom:5px; color:#ccc;">Quantity Used / Removed</label>
                 <input type="number" step="0.01" name="quantity" placeholder="0.00" required style="margin-bottom:20px; font-size:1.2rem;">
-
                 <button type="submit" name="submit_use" style="background:#ff4b4b; width:100%;">- Confirm Usage</button>
             </form>
         </div>
@@ -207,22 +197,11 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     $records = $pdo->query("SELECT * FROM stock_logs WHERE DATE(log_date) = '$today' ORDER BY id DESC")->fetchAll(); ?>
 
     <div class="form-container" style="max-width:800px;">
-        <div class="form-header"><a href="?page=stock" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
-            <h2>Stock Activity: Today</h2>
-        </div>
+        <div class="form-header"><a href="?page=stock" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>Stock Activity: Today</h2></div>
         <div class="card" style="text-align:left;">
             <div class="table-responsive">
                 <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Item</th>
-                            <th>Action</th>
-                            <th>Qty</th>
-                            <th>Cost</th>
-                            <th>User</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Time</th><th>Item</th><th>Action</th><th>Qty</th><th>Cost</th><th>User</th></tr></thead>
                     <tbody>
                         <?php foreach ($records as $r): ?>
                             <tr>
@@ -234,7 +213,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                                 <td data-label="User"><?php echo $r['user']; ?></td>
                             </tr>
                         <?php endforeach; ?>
-                        <?php if (empty($records)) echo "<tr><td colspan='6' style='text-align:center; padding:20px;'>No activity today.</td></tr>"; ?>
                     </tbody>
                 </table>
             </div>
@@ -242,30 +220,16 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'history' && isset($_GET['id'])):
-    // ITEM HISTORY
-    $n = $pdo->prepare("SELECT name FROM stock WHERE id = ?");
-    $n->execute([$_GET['id']]);
-    $name = $n->fetchColumn();
-    $logs = $pdo->prepare("SELECT * FROM stock_logs WHERE item_id = ? ORDER BY id DESC");
-    $logs->execute([$_GET['id']]);
-    $history = $logs->fetchAll(); ?>
+    // HISTORY VIEW
+    $n = $pdo->prepare("SELECT name FROM stock WHERE id = ?"); $n->execute([$_GET['id']]); $name = $n->fetchColumn();
+    $logs = $pdo->prepare("SELECT * FROM stock_logs WHERE item_id = ? ORDER BY id DESC"); $logs->execute([$_GET['id']]); $history = $logs->fetchAll(); ?>
 
     <div class="form-container" style="max-width:800px;">
-        <div class="form-header"><a href="?page=stock" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
-            <h2>History: <?php echo $name; ?></h2>
-        </div>
+        <div class="form-header"><a href="?page=stock" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>History: <?php echo $name; ?></h2></div>
         <div class="card" style="text-align:left;">
             <div class="table-responsive">
                 <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Action</th>
-                            <th>Qty</th>
-                            <th>Cost</th>
-                            <th>User</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Date</th><th>Action</th><th>Qty</th><th>Cost</th><th>User</th></tr></thead>
                     <tbody>
                         <?php foreach ($history as $h): ?>
                             <tr>
@@ -283,16 +247,18 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php else:
-    // MAIN LIST (DEFAULT) - UPDATED FOR FILTERING
-    $low_stock = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity < 10")->fetchColumn();
+    // MAIN LIST - UPDATED FOR DYNAMIC THRESHOLD
+    // Now counts based on specific 'min_threshold'
+    $low_stock = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity <= min_threshold")->fetchColumn();
+    
     $today = date('Y-m-d');
     $act_today = $pdo->query("SELECT COUNT(*) FROM stock_logs WHERE DATE(log_date) = '$today'")->fetchColumn();
 
-    // FILTER LOGIC ADDED HERE
+    // UPDATED FILTER LOGIC
     $filter_low = isset($_GET['filter']) && $_GET['filter'] == 'low';
     $sql = "SELECT * FROM stock";
     if ($filter_low) {
-        $sql .= " WHERE quantity <= 10";
+        $sql .= " WHERE quantity <= min_threshold"; // Dynamic check
     }
     $sql .= " ORDER BY id DESC";
     $items = $pdo->query($sql)->fetchAll();
@@ -310,7 +276,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
             <div class="metric-card" style="border-left:4px solid #FF9800; cursor:pointer;">
                 <h4>Low Stock</h4>
                 <div class="value" style="<?php echo ($low_stock > 0) ? 'color:#FF9800' : ''; ?>"><?php echo $low_stock; ?></div>
-                <div class="sub-text">Click to filter items</div>
+                <div class="sub-text">Items needing attention</div>
             </div>
         </a>
     </div>
@@ -341,7 +307,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <tr>
                             <td data-label="Name"><?php echo $item['name']; ?></td>
                             <td data-label="Quantity">
-                                <span style="font-weight:bold; color:<?php echo ($item['quantity'] < 10) ? '#FF9800' : '#4CAF50'; ?>;">
+                                <span style="font-weight:bold; color:<?php echo ($item['quantity'] <= $item['min_threshold']) ? '#FF9800' : '#4CAF50'; ?>;">
                                     <?php echo $item['quantity'] . ' ' . $item['unit']; ?>
                                 </span>
                             </td>

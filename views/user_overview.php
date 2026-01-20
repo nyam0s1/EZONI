@@ -1,9 +1,7 @@
 <?php
 /**
- * USER OVERVIEW VIEW
- * ------------------
- * Displays: Production Today, Low Stock Alerts, Active Animals.
- * ALL cards are now clickable shortcuts.
+ * USER OVERVIEW VIEW - DYNAMIC ALERTS VERSION
+ * - Update: "Attention Needed" count respects all custom thresholds.
  */
 
 // 1. CALCULATE METRICS
@@ -15,10 +13,24 @@ try {
     $prod_today->execute([$today]); 
     $val_today = $prod_today->fetchColumn() ?: 0;
     
-    // Combined Low Stock Counter
-    $stock_low = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity < 10")->fetchColumn();
-    $prod_low = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity < 10")->fetchColumn();
-    $total_alerts = $stock_low + $prod_low;
+    // Low Stock (Inventory + Produce) - DYNAMIC CHECK
+    $stock_low = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
+    $prod_low = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
+    
+    // Low Stock (Livestock) - DYNAMIC CHECK
+    $sql_animal_alerts = "
+        SELECT COUNT(*) FROM (
+            SELECT a.species, COUNT(*) as qty, l.min_threshold 
+            FROM animals a 
+            JOIN species_limits l ON a.species = l.species 
+            WHERE a.status='Active' 
+            GROUP BY a.species 
+            HAVING qty <= l.min_threshold
+        ) as alerts
+    ";
+    $animal_low = $pdo->query($sql_animal_alerts)->fetchColumn() ?: 0;
+
+    $total_alerts = $stock_low + $prod_low + $animal_low;
 
     // Active Animals
     $animals = $pdo->query("SELECT COUNT(*) FROM animals WHERE status='Active'")->fetchColumn() ?: 0;
