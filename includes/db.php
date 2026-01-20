@@ -7,6 +7,10 @@ $password = '';          // CHANGE THIS on live server
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+
+    //Timezone Setting
+    date_default_timezone_set('Africa/Nairobi'); // Fixes PHP time
+    $pdo->exec("SET time_zone = '+03:00'");       // Fixes MySQL Database time
     
     // Set Error Mode to Exception
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
