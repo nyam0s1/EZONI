@@ -30,21 +30,21 @@
             <input type="text" name="username" placeholder="Username" required autocomplete="off">
             <input type="email" name="email" placeholder="Email Address" required>
             
-            <div class="password-wrapper" style="margin-bottom:0;">
+            <div class="password-wrapper" style="margin-bottom: 0;">
                 <input type="password" name="password" placeholder="Create Password" required>
                 <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
                     <i class="fas fa-eye"></i>
                 </button>
             </div>
 
-            <div class="password-wrapper" style="margin-bottom:10px;">
+            <div class="password-wrapper" style="margin-bottom: 10px;">
                 <input type="password" name="confirm_password" placeholder="Confirm Password" required>
                 <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
                     <i class="fas fa-eye"></i>
                 </button>
             </div>
             
-            <button type="submit" style="background-color: #2196F3; font-size: 1rem;">Create Account</button>
+            <button type="submit" style="background-color: #2196F3; font-size: 1rem; margin-top: 10px;">Create Account</button>
         </form>
 
         <p style="margin-top: 20px; color: #ccc;">
@@ -54,6 +54,7 @@
 
     <script>
         function togglePassword(btn) {
+            // Select the input that is strictly the previous sibling
             const input = btn.previousElementSibling;
             const icon = btn.querySelector('i');
             
