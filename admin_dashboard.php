@@ -23,7 +23,6 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,45 +35,34 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
     <link rel="apple-touch-icon" href="images/logo.png">
     <meta name="theme-color" content="#0e1117">
 </head>
-
 <body class="dashboard-body">
 
     <div class="sidebar" id="sidebar">
         <button class="mobile-close-btn" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
-
         <div class="sidebar-profile">
             <small>Logged in as:</small>
             <h3><?php echo htmlspecialchars($_SESSION['username']); ?></h3>
             <span class="role-badge-small">Role: Admin</span>
         </div>
-
         <a href="?page=overview" class="nav-link <?php echo $page == 'overview' ? 'active' : ''; ?>"><i class="fas fa-tachometer-alt"></i> <span class="nav-text">Overview</span></a>
         <a href="?page=users" class="nav-link <?php echo $page == 'users' ? 'active' : ''; ?>"><i class="fas fa-users-cog"></i> <span class="nav-text">Users</span></a>
         <a href="?page=stock" class="nav-link <?php echo $page == 'stock' ? 'active' : ''; ?>"><i class="fas fa-boxes"></i> <span class="nav-text">Inventory</span></a>
         <a href="?page=animals" class="nav-link <?php echo $page == 'animals' ? 'active' : ''; ?>"><i class="fas fa-paw"></i> <span class="nav-text">Livestock</span></a>
         <a href="?page=sales" class="nav-link <?php echo $page == 'sales' ? 'active' : ''; ?>"><i class="fas fa-coins"></i> <span class="nav-text">Produce</span></a>
         <a href="?page=reports" class="nav-link <?php echo $page == 'reports' ? 'active' : ''; ?>"><i class="fas fa-chart-line"></i> <span class="nav-text">Reports</span></a>
-
         <a href="?page=profile" class="nav-link <?php echo $page == 'profile' ? 'active' : ''; ?>"><i class="fas fa-user-circle"></i> <span class="nav-text">My Profile</span></a>
-
         <a href="?page=settings" class="nav-link <?php echo $page == 'settings' ? 'active' : ''; ?>"><i class="fas fa-cog"></i> <span class="nav-text">Settings</span></a>
-
         <a href="logout.php" class="nav-link logout-btn"><i class="fas fa-sign-out-alt"></i> <span class="nav-text">Logout</span></a>
         <a href="?page=delete_account" class="nav-link <?php echo $page == 'delete_account' ? 'active' : ''; ?>" style="color: #888; font-size: 0.9rem;"><i class="fas fa-trash-alt"></i> <span class="nav-text">Delete Account</span></a>
-
         <button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
     </div>
 
     <div class="main-content">
-
         <div class="top-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px;">
-
             <div style="display: flex; align-items: center; gap: 10px;">
                 <button class="mobile-toggle" onclick="toggleSidebar()" style="position: relative; margin: 0; background: none; border: none; font-size: 1.4rem; color: #fff; cursor: pointer;"><i class="fas fa-bars"></i></button>
-
                 <h2 class="brand-title" style="margin: 0; font-size: 1.5rem; line-height: 1; white-space: nowrap;">EZONI FARM</h2>
             </div>
-
             <a href="?page=profile" style="text-decoration:none;">
                 <div style="display:flex; align-items:center; gap:10px; cursor:pointer;">
                     <span class="user-name-label" style="color:#aaa; font-size:0.9rem;"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
@@ -103,69 +91,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
         } elseif ($page == 'settings') {
             include 'views/settings_view.php';
         } elseif ($page == 'alerts') {
-            try {
-                // 1. Inventory (Dynamic Threshold)
-                $stock_alerts = $pdo->query("SELECT id, name, quantity, unit, 'Inventory' as type FROM stock WHERE quantity <= min_threshold")->fetchAll(PDO::FETCH_ASSOC);
-
-                // 2. Produce (Dynamic Threshold)
-                $produce_alerts = $pdo->query("SELECT id, name, quantity, unit, 'Produce' as type FROM produce WHERE quantity <= min_threshold")->fetchAll(PDO::FETCH_ASSOC);
-
-                // 3. Livestock (Strict Mode Compliant Query)
-                // We now GROUP BY both species AND min_threshold to satisfy strict SQL rules.
-                $sql_animal = "
-                    SELECT NULL as id, a.species as name, COUNT(*) as quantity, 'Heads' as unit, 'Livestock' as type 
-                    FROM animals a 
-                    JOIN species_limits l ON a.species = l.species 
-                    WHERE a.status='Active' 
-                    GROUP BY a.species, l.min_threshold 
-                    HAVING quantity <= l.min_threshold";
-                $animal_alerts = $pdo->query($sql_animal)->fetchAll(PDO::FETCH_ASSOC);
-
-                $all_alerts = array_merge($stock_alerts, $produce_alerts, $animal_alerts);
-            } catch (Exception $e) {
-                // This will show the error instead of a white screen if something is still wrong
-                echo "<div class='card' style='border-top:3px solid #ff4b4b; color:#ff4b4b;'>
-                        <h3>⚠️ System Error</h3>
-                        <p><strong>Technical Error:</strong> " . $e->getMessage() . "</p>
-                      </div>";
-                $all_alerts = [];
-            }
-        ?>
-            <div class="form-container" style="max-width:900px;">
-                <div class="form-header"><a href="?page=overview" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
-                    <h2>⚠️ Low Stock Report</h2>
-                </div>
-                <div class="card">
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Type</th>
-                                    <th>Item Name</th>
-                                    <th>Current Qty</th>
-                                    <th style="text-align:right;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($all_alerts as $alert): ?>
-                                    <tr>
-                                        <td data-label="Type"><span class="badge <?php echo ($alert['type'] == 'Inventory') ? 'badge-orange' : (($alert['type'] == 'Produce') ? 'badge-green' : 'badge-blue'); ?>"><?php echo $alert['type']; ?></span></td>
-                                        <td data-label="Item Name" style="font-weight:bold; color:#fff;"><?php echo $alert['name']; ?></td>
-                                        <td data-label="Current Qty"><span style="color:#ff4b4b; font-weight:bold; font-size:1.1rem;"><?php echo $alert['quantity']; ?></span> <small style="color:#888;"><?php echo $alert['unit']; ?></small></td>
-                                        <td data-label="Action" style="text-align:right;">
-                                            <?php if ($alert['type'] == 'Inventory'): ?><a href="?page=stock&action=restock&id=<?php echo $alert['id']; ?>" class="badge badge-green" style="text-decoration:none;">Restock 📥</a>
-                                            <?php elseif ($alert['type'] == 'Produce'): ?><a href="?page=sales&action=harvest&id=<?php echo $alert['id']; ?>" class="badge badge-blue" style="text-decoration:none;">Harvest 🌾</a>
-                                            <?php else: ?><a href="?page=animals&action=add" class="badge badge-green" style="text-decoration:none;">+ Add</a><?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                <?php if (empty($all_alerts) && !isset($e)) echo "<tr><td colspan='4' style='text-align:center; padding:30px; color:#aaa;'>No low stock items found. Great job! 🎉</td></tr>"; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        <?php
+            include 'views/alerts_view.php'; // <--- FIXED: Now uses the external file
         } elseif ($page == 'delete_account') {
             $error = '';
             if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -194,19 +120,10 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
             }
         ?>
             <div class="form-container">
-                <div class="form-header"><a href="?page=overview" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
-                    <h2>Delete Account</h2>
-                </div>
+                <div class="form-header"><a href="?page=overview" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a><h2>Delete Account</h2></div>
                 <div class="card" style="text-align:center; border-top: 3px solid #ff4b4b;">
                     <h3 style="color:#ff4b4b;">Delete Account?</h3>
-                    <p style="color:#aaa; margin-bottom:20px;">This action is permanent.</p><?php if ($error): ?><p style="color:#ff4b4b;"><?php echo $error; ?></p><?php endif; ?><form method="POST">
-                        <div class="password-wrapper" style="margin-bottom:15px;">
-                            <input type="password" name="password" placeholder="Confirm Password" required style="text-align:center;">
-                            <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div><button type="submit" style="background:#ff4b4b; width:100%;">Confirm Delete</button>
-                    </form>
+                    <p style="color:#aaa; margin-bottom:20px;">This action is permanent.</p><?php if ($error): ?><p style="color:#ff4b4b;"><?php echo $error; ?></p><?php endif; ?><form method="POST"><div class="password-wrapper" style="margin-bottom:15px;"><input type="password" name="password" placeholder="Confirm Password" required style="text-align:center;"><button type="button" class="toggle-password-btn" onclick="togglePassword(this)"><i class="fas fa-eye"></i></button></div><button type="submit" style="background:#ff4b4b; width:100%;">Confirm Delete</button></form>
                 </div>
             </div>
         <?php
@@ -220,65 +137,17 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'overview';
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const width = window.innerWidth;
-            if (width <= 768) {
-                sidebar.classList.toggle('mobile-open');
-            } else {
-                sidebar.classList.toggle('collapsed');
-                localStorage.setItem('sidebarState', sidebar.classList.contains('collapsed') ? 'collapsed' : 'expanded');
-            }
+            if (width <= 768) { sidebar.classList.toggle('mobile-open'); } 
+            else { sidebar.classList.toggle('collapsed'); localStorage.setItem('sidebarState', sidebar.classList.contains('collapsed') ? 'collapsed' : 'expanded'); }
         }
-        if (window.innerWidth > 768 && localStorage.getItem('sidebarState') === 'collapsed') {
-            document.getElementById('sidebar').classList.add('collapsed');
-        }
+        if (window.innerWidth > 768 && localStorage.getItem('sidebarState') === 'collapsed') { document.getElementById('sidebar').classList.add('collapsed'); }
     </script>
-
     <script>
-        function togglePassword(btn) {
-            // Find the input field right before this button
-            const input = btn.previousElementSibling;
-            const icon = btn.querySelector('i');
-
-            if (input.type === "password") {
-                input.type = "text";
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = "password";
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
-            }
-        }
+        function togglePassword(btn) { const input = btn.previousElementSibling; const icon = btn.querySelector('i'); if (input.type === "password") { input.type = "text"; icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); } else { input.type = "password"; icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); } }
     </script>
-
     <style>
-        /* Force static position for toggle so it doesn't float over text */
-        .mobile-toggle {
-            display: none;
-            /* Hidden on desktop by default */
-        }
-
-        @media (max-width: 768px) {
-            .mobile-toggle {
-                display: block;
-            }
-
-            /* Shrink Brand Title on Mobile */
-            .brand-title {
-                font-size: 1.1rem !important;
-                white-space: nowrap;
-            }
-
-            /* Hide Username text on mobile, keep avatar */
-            .user-name-label {
-                display: none;
-            }
-
-            /* Adjust Top Bar Padding */
-            .top-bar {
-                padding: 10px !important;
-            }
-        }
+        .mobile-toggle { display: none; }
+        @media (max-width: 768px) { .mobile-toggle { display: block; } .brand-title { font-size: 1.1rem !important; white-space: nowrap; } .user-name-label { display: none; } .top-bar { padding: 10px !important; } }
     </style>
 </body>
-
 </html>
