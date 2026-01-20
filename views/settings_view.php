@@ -1,9 +1,9 @@
 <?php
 /**
- * SETTINGS VIEW - HEADER BUTTON VERSION
- * - Feature: "Add" buttons are now top-right (Professional Style).
- * - Feature: Dedicated Add Pages for clean mobile input.
- * - Logic: Cascading updates for Species renaming.
+ * SETTINGS VIEW - SHORT TITLES VERSION
+ * - Feature: Header titles shortened to "Inventory" and "Produce" to fit mobile screens.
+ * - Feature: Header "Add" buttons (Top-Right).
+ * - Feature: Dedicated Add Pages.
  */
 
 // --- BACKEND LOGIC ---
@@ -145,7 +145,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'main';
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div style="display:flex; align-items:center;">
                 <a href="?page=settings" style="text-decoration:none; color:#ccc; margin-right:15px; font-size:1rem;"><i class="fas fa-arrow-left"></i> Back</a>
-                <h2 style="margin:0;">📦 Inventory Categories</h2>
+                <h2 style="margin:0;">📦 Inventory</h2>
             </div>
             <a href="?page=settings&section=add_inv_cat" style="background:#4CAF50; color:white; padding:10px 20px; text-decoration:none; border-radius:5px; font-weight:bold;">+ Add</a>
         </div>
@@ -175,7 +175,7 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'main';
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div style="display:flex; align-items:center;">
                 <a href="?page=settings" style="text-decoration:none; color:#ccc; margin-right:15px; font-size:1rem;"><i class="fas fa-arrow-left"></i> Back</a>
-                <h2 style="margin:0;">💰 Produce Categories</h2>
+                <h2 style="margin:0;">💰 Produce</h2>
             </div>
             <a href="?page=settings&section=add_prod_cat" style="background:#4CAF50; color:white; padding:10px 20px; text-decoration:none; border-radius:5px; font-weight:bold;">+ Add</a>
         </div>
