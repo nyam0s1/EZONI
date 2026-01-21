@@ -103,8 +103,32 @@ body.dashboard-body {
     padding-top: 0;
     position: relative;
     z-index: 100;
+    
+    /* NEW: Enable Scrolling */
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100vh; /* Ensures it fills the screen so it CAN scroll */
 }
 
+/* NEW: Custom Scrollbar for Sidebar (Thin & Subtle) */
+.sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ...sidebar-profile styles ... */
 .sidebar-profile {
     padding: 20px;
     text-align: center;
