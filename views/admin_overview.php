@@ -1,54 +1,29 @@
 <?php
 
 /**
- * ADMIN OVERVIEW VIEW - VISUAL FIX
- * - Update: "Low Stock" card now matches User Dashboard style (Red/Attention Needed).
+ * ADMIN OVERVIEW VIEW - UPDATED LINK
+ * - Update: "Recent Activity" header now links to the full Reports page.
  */
 
-// 1. CALCULATE METRICS
+// ... (Calculations logic remains exactly the same) ...
 try {
     $today = date('Y-m-d');
-
-    // Revenue Today
     $stmt = $pdo->prepare("SELECT SUM(total_revenue) FROM sales_logs WHERE DATE(log_date) = ? AND action_type='Sold'");
     $stmt->execute([$today]);
     $rev = $stmt->fetchColumn() ?: 0;
 
-    // Low Stock (Inventory + Produce)
     $stock_low = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
     $prod_low = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
 
-    // Low Stock (Livestock)
-    $sql_animal_alerts = "
-        SELECT COUNT(*) FROM (
-            SELECT a.species, COUNT(*) as qty, l.min_threshold 
-            FROM animals a 
-            JOIN species_limits l ON a.species = l.species 
-            WHERE a.status='Active' 
-            GROUP BY a.species, l.min_threshold 
-            HAVING qty <= l.min_threshold
-        ) as alerts
-    ";
+    $sql_animal_alerts = "SELECT COUNT(*) FROM (SELECT a.species, COUNT(*) as qty, l.min_threshold FROM animals a JOIN species_limits l ON a.species = l.species WHERE a.status='Active' GROUP BY a.species, l.min_threshold HAVING qty <= l.min_threshold) as alerts";
     $animal_low = $pdo->query($sql_animal_alerts)->fetchColumn() ?: 0;
 
     $total_alerts = $stock_low + $prod_low + $animal_low;
-
-    // Active Animals
     $animals = $pdo->query("SELECT COUNT(*) FROM animals WHERE status='Active'")->fetchColumn() ?: 0;
-
-    // Total Users
     $users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn() ?: 0;
-
-    // Check Pending Users (For Alert)
     $pending_users = $pdo->query("SELECT COUNT(*) FROM users WHERE status='pending'")->fetchColumn() ?: 0;
 
-    // RECENT ACTIVITY
-    $sql_recent = "
-        SELECT s.*, p.id as pid 
-        FROM sales_logs s 
-        LEFT JOIN produce p ON s.product_name = p.name 
-        ORDER BY s.id DESC LIMIT 8
-    ";
+    $sql_recent = "SELECT s.*, p.id as pid FROM sales_logs s LEFT JOIN produce p ON s.product_name = p.name ORDER BY s.id DESC LIMIT 8";
     $recent_logs = $pdo->query($sql_recent)->fetchAll();
 } catch (Exception $e) {
     $rev = 0;
@@ -60,7 +35,6 @@ try {
 ?>
 
 <div class="metrics-grid">
-
     <?php if ($pending_users > 0): ?>
         <a href="?page=users&filter=pending" style="text-decoration:none;">
             <div class="metric-card" style="border-left:4px solid #FF9800; background: rgba(255, 152, 0, 0.15); transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
@@ -105,7 +79,11 @@ try {
 </div>
 
 <div class="card">
-    <h3>🕒 Recent Activity</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3>🕒 Recent Activity</h3>
+        <a href="?page=reports" style="color:#2196F3; text-decoration:none; font-size:0.9rem; font-weight:600;">View Full Report <i class="fas fa-arrow-right"></i></a>
+    </div>
+
     <div class="table-responsive">
         <table class="data-table">
             <thead>

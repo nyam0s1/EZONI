@@ -1,23 +1,24 @@
 <?php
+
 /**
  * USER OVERVIEW VIEW - CLICKABLE ROWS VERSION
  * - Update: Recent Activity rows are now clickable.
- * - Update: Detailed Date/Time format.
+ * - Update: "View Full History" link added to header.
  */
 
 // 1. CALCULATE METRICS
 try {
     $today = date('Y-m-d');
-    
+
     // Production Today
-    $prod_today = $pdo->prepare("SELECT SUM(quantity) FROM sales_logs WHERE action_type='Harvest' AND DATE(log_date) = ?"); 
-    $prod_today->execute([$today]); 
+    $prod_today = $pdo->prepare("SELECT SUM(quantity) FROM sales_logs WHERE action_type='Harvest' AND DATE(log_date) = ?");
+    $prod_today->execute([$today]);
     $val_today = $prod_today->fetchColumn() ?: 0;
-    
+
     // Low Stock (All)
     $stock_low = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
     $prod_low = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
-    
+
     // Livestock Alerts
     $sql_animal_alerts = "
         SELECT COUNT(*) FROM (
@@ -35,7 +36,7 @@ try {
 
     // Active Animals
     $animals = $pdo->query("SELECT COUNT(*) FROM animals WHERE status='Active'")->fetchColumn() ?: 0;
-    
+
     // RECENT LOGS (Updated Query with Join)
     $sql_recent = "
         SELECT s.*, p.id as pid 
@@ -44,14 +45,16 @@ try {
         ORDER BY s.id DESC LIMIT 8
     ";
     $recent_logs = $pdo->query($sql_recent)->fetchAll();
-
-} catch (Exception $e) { 
-    $val_today = 0; $total_alerts = 0; $animals = 0; $recent_logs = []; 
+} catch (Exception $e) {
+    $val_today = 0;
+    $total_alerts = 0;
+    $animals = 0;
+    $recent_logs = [];
 }
 ?>
 
 <div class="metrics-grid">
-    
+
     <a href="?page=sales" style="text-decoration:none;">
         <div class="metric-card" style="transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <h4>Production Today</h4>
@@ -59,7 +62,7 @@ try {
             <div class="sub-text">Fresh Harvest</div>
         </div>
     </a>
-    
+
     <a href="?page=alerts" style="text-decoration:none;">
         <div class="metric-card" style="border-left: 4px solid #ff4b4b; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <h4>Attention Needed</h4>
@@ -78,7 +81,11 @@ try {
 </div>
 
 <div class="card">
-    <h3>🕒 Recent Activity</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3>🕒 Recent Activity</h3>
+        <a href="?page=reports" style="color:#2196F3; text-decoration:none; font-size:0.9rem; font-weight:600;">View Full History <i class="fas fa-arrow-right"></i></a>
+    </div>
+
     <div class="table-responsive">
         <table class="data-table">
             <thead>
@@ -89,25 +96,24 @@ try {
                 </tr>
             </thead>
             <tbody>
-                <?php foreach($recent_logs as $l): ?>
-                <tr 
-                    <?php if($l['pid']): ?>
-                        onclick="window.location.href='?page=sales&action=history&id=<?php echo $l['pid']; ?>'" 
+                <?php foreach ($recent_logs as $l): ?>
+                    <tr
+                        <?php if ($l['pid']): ?>
+                        onclick="window.location.href='?page=sales&action=history&id=<?php echo $l['pid']; ?>'"
                         style="cursor:pointer;"
-                    <?php endif; ?>
-                >
-                    <td data-label="Action">
-                        <span class="badge <?php echo ($l['action_type']=='Sold')?'badge-green':(($l['action_type']=='Harvest')?'badge-blue':'badge-orange'); ?>">
-                            <?php echo $l['action_type']; ?>
-                        </span>
-                    </td>
-                    <td data-label="Product"><?php echo $l['product_name']; ?></td>
-                    <td data-label="Date & Time" style="font-size:0.9rem; color:#888; text-align:right;">
-                        <?php echo date('d M, H:i', strtotime($l['log_date'])); ?>
-                    </td>
-                </tr>
+                        <?php endif; ?>>
+                        <td data-label="Action">
+                            <span class="badge <?php echo ($l['action_type'] == 'Sold') ? 'badge-green' : (($l['action_type'] == 'Harvest') ? 'badge-blue' : 'badge-orange'); ?>">
+                                <?php echo $l['action_type']; ?>
+                            </span>
+                        </td>
+                        <td data-label="Product"><?php echo $l['product_name']; ?></td>
+                        <td data-label="Date & Time" style="font-size:0.9rem; color:#888; text-align:right;">
+                            <?php echo date('d M, H:i', strtotime($l['log_date'])); ?>
+                        </td>
+                    </tr>
                 <?php endforeach; ?>
-                <?php if(empty($recent_logs)) echo "<tr><td colspan='3' style='text-align:center; color:#666;'>No recent activity</td></tr>"; ?>
+                <?php if (empty($recent_logs)) echo "<tr><td colspan='3' style='text-align:center; color:#666;'>No recent activity</td></tr>"; ?>
             </tbody>
         </table>
     </div>

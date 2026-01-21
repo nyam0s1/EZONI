@@ -2,8 +2,7 @@
 
 /**
  * SALES / PRODUCE VIEW
- * - Manages Produce Types, Harvests, and Sales.
- * - Update: Added dedicated "Low Stock" report page.
+ * - Update: "Sales Today" card is now a tappable link to the Daily Report.
  */
 
 // --- BACKEND LOGIC ---
@@ -31,10 +30,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_harvest'])) {
     }
 }
 
-// 3. SELL (Remove Stock + Revenue)
+// 3. SELL (Remove Stock + Revenue + Customer)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_sell'])) {
     $qty = floatval($_POST['quantity']);
     $price = floatval($_POST['price']);
+    // Capture Customer Name
+    $customer = !empty($_POST['customer_name']) ? trim($_POST['customer_name']) : 'Walk-in';
     $total = $qty * $price;
 
     $stmt = $pdo->prepare("SELECT quantity FROM produce WHERE id = ?");
@@ -43,8 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_sell'])) {
 
     if ($qty > 0 && $curr >= $qty) {
         $pdo->prepare("UPDATE produce SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, unit_price, total_revenue, user) VALUES (?, 'Sold', ?, ?, ?, ?, ?)")
-            ->execute([$_POST['name'], $qty, $_POST['unit'], $price, $total, $_SESSION['username']]);
+
+        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, unit_price, total_revenue, customer_name, user) VALUES (?, 'Sold', ?, ?, ?, ?, ?, ?)")
+            ->execute([$_POST['name'], $qty, $_POST['unit'], $price, $total, $customer, $_SESSION['username']]);
+
         echo "<script>window.location.href='?page=sales';</script>";
     } else {
         echo "<script>alert('Error: Not enough produce to sell!');</script>";
@@ -132,6 +135,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <input type="hidden" name="name" value="<?php echo $item['name']; ?>">
                 <input type="hidden" name="unit" value="<?php echo $item['unit']; ?>">
 
+                <label style="display:block; margin-bottom:5px; color:#ccc;">Customer Name</label>
+                <input type="text" name="customer_name" placeholder="Who is buying?" style="margin-bottom:15px;">
+
                 <div style="display:flex; gap:15px; margin-bottom:15px;">
                     <div style="flex:1;">
                         <label style="display:block; margin-bottom:5px; color:#ccc;">Qty Sold</label>
@@ -174,6 +180,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <tr>
                             <th>Date</th>
                             <th>Action</th>
+                            <th>Customer</th>
                             <th>Qty</th>
                             <th>Revenue</th>
                             <th>User</th>
@@ -184,6 +191,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                             <tr>
                                 <td data-label="Date" style="color:#888;"><?php echo date('d M, H:i', strtotime($h['log_date'])); ?></td>
                                 <td data-label="Action"><span class="badge <?php echo ($h['action_type'] == 'Sold') ? 'badge-green' : 'badge-blue'; ?>"><?php echo $h['action_type']; ?></span></td>
+                                <td data-label="Customer" style="color:#ccc;">
+                                    <?php echo ($h['action_type'] == 'Sold' && !empty($h['customer_name'])) ? htmlspecialchars($h['customer_name']) : '-'; ?>
+                                </td>
                                 <td data-label="Qty"><strong><?php echo $h['quantity'] . ' ' . $h['unit']; ?></strong></td>
                                 <td data-label="Revenue"><?php echo ($h['total_revenue'] > 0) ? '+' . $h['total_revenue'] : '-'; ?></td>
                                 <td data-label="User"><?php echo $h['user']; ?></td>
@@ -197,7 +207,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
 <?php elseif ($action == 'low_stock'): ?>
     <?php
-    // --- NEW: DEDICATED LOW STOCK REPORT FOR PRODUCE ---
     $low_items = $pdo->query("SELECT * FROM produce WHERE quantity <= min_threshold ORDER BY quantity ASC")->fetchAll();
     ?>
     <div class="form-container" style="max-width: 800px;">
@@ -246,26 +255,25 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
 <?php else:
     // MAIN LIST
-    // Count Alerts
     $low_count = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity <= min_threshold")->fetchColumn();
-
-    // Activity Today
     $today = date('Y-m-d');
     $sales_today = $pdo->prepare("SELECT SUM(total_revenue) FROM sales_logs WHERE action_type='Sold' AND DATE(log_date) = ?");
     $sales_today->execute([$today]);
     $rev = $sales_today->fetchColumn() ?: 0;
-
     $products = $pdo->query("SELECT * FROM produce ORDER BY id DESC")->fetchAll(); ?>
 
     <div class="metrics-grid">
-        <div class="metric-card" style="border-left:4px solid #4CAF50;">
-            <h4>Sales Today</h4>
-            <div class="value" style="color:#4CAF50;">Ksh <?php echo number_format($rev); ?></div>
-            <div class="sub-text">Revenue generated</div>
-        </div>
 
-        <a href="?page=sales&action=low_stock" style="text-decoration:none; color:inherit;">
-            <div class="metric-card" style="border-left:4px solid #FF9800; cursor:pointer;">
+        <a href="?page=reports&start=<?php echo $today; ?>&end=<?php echo $today; ?>" style="text-decoration:none; color:inherit; display:block;">
+            <div class="metric-card" style="border-left:4px solid #4CAF50; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4>Sales Today <i class="fas fa-external-link-alt" style="font-size:0.8rem; margin-left:5px; opacity:0.5;"></i></h4>
+                <div class="value" style="color:#4CAF50;">Ksh <?php echo number_format($rev); ?></div>
+                <div class="sub-text">Tap to view Details</div>
+            </div>
+        </a>
+
+        <a href="?page=sales&action=low_stock" style="text-decoration:none; color:inherit; display:block;">
+            <div class="metric-card" style="border-left:4px solid #FF9800; cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4>Low Stock</h4>
                 <div class="value" style="<?php echo ($low_count > 0) ? 'color:#FF9800' : ''; ?>"><?php echo $low_count; ?></div>
                 <div class="sub-text">Items needing harvest</div>
