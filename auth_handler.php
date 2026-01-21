@@ -23,21 +23,24 @@ if ($action == 'login') {
 
     // Verify Password
     if ($account && password_verify($pass, $account['password'])) {
-        
+
         // CHECK 1: IS ACCOUNT SUSPENDED?
         if ($account['status'] === 'suspended') {
-            
-            // LOG THE ATTEMPT (The "Knock at the Door")
             try {
-                $log = $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, 'Blocked Login Attempt', 'System')");
-                $log->execute([$account['id']]);
-            } catch (Exception $e) { /* Ignore logging errors to prevent crash */ }
-
+                $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, 'Blocked Login Attempt', 'System')")->execute([$account['id']]);
+            } catch (Exception $e) {
+            }
             header("Location: index.php?error=Your account is suspended. Contact Admin.");
             exit();
         }
 
-        // CHECK 2: SUCCESS
+        // CHECK 2: IS ACCOUNT PENDING? (The Update)
+        if ($account['status'] === 'pending') {
+            header("Location: index.php?error=Awaiting Validation");
+            exit();
+        }
+
+        // CHECK 3: SUCCESS
         $_SESSION['user_id'] = $account['id'];
         $_SESSION['username'] = $account['username'];
         $_SESSION['role'] = $account['role'];
@@ -48,7 +51,6 @@ if ($action == 'login') {
             header("Location: user_dashboard.php");
         }
         exit();
-
     } else {
         header("Location: index.php?error=Invalid Username or Password");
         exit();
@@ -71,26 +73,27 @@ elseif ($action == 'register') {
 
     $check = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
     $check->execute([$username, $email]);
-    
+
     if ($check->rowCount() > 0) {
         header("Location: register.php?error=Username or Email already taken");
         exit();
     }
 
     $hashed_pass = password_hash($password, PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare("INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, 'user', 'active')");
-    
-    if ($stmt->execute([$username, $email, $hashed_pass])) {
-        
-        // LOG THE NEW USER
-        $new_id = $pdo->lastInsertId();
-        $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, 'Account Created', 'Self-Register')")->execute([$new_id]);
 
-        header("Location: index.php?registered=1");
+    // Status is 'pending' by default
+    $stmt = $pdo->prepare("INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, 'user', 'pending')");
+
+    if ($stmt->execute([$username, $email, $hashed_pass])) {
+
+        $new_id = $pdo->lastInsertId();
+        $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, 'Registration Request', 'Self-Register')")->execute([$new_id]);
+
+        // UPDATE: Specific pending flag
+        header("Location: index.php?registered=pending");
         exit();
     } else {
         header("Location: register.php?error=Something went wrong");
         exit();
     }
 }
-?>

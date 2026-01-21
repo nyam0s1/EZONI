@@ -1,14 +1,13 @@
 <?php
 
 /**
- * USERS MANAGEMENT VIEW - FINAL SECURE VERSION
- * - Features: Add User (w/ Email), Secure Suspend, Secure Delete, Secure Activate, Login Alerts, User History.
- * - Update: Activation now requires Admin Password confirmation.
+ * USERS MANAGEMENT VIEW - GATEKEEPER VERSION
+ * - Feature: 'Pending' filter to manage new registrations.
+ * - Feature: Approve/Reject actions for pending users.
  */
 
 // --- LOGIC & LOGGING ---
 
-// HELPER: Log User Action
 function log_user_action($pdo, $target_id, $action)
 {
     $performer = $_SESSION['username'];
@@ -16,14 +15,13 @@ function log_user_action($pdo, $target_id, $action)
     $stmt->execute([$target_id, $action, $performer]);
 }
 
-// 1. ADD NEW USER
+// 1. ADD NEW USER (Manual Admin Add - Auto Active)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_user'])) {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $role = $_POST['role'];
 
-    // Check if username/email exists
     $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
     $stmt->execute([$username, $email]);
 
@@ -33,22 +31,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_user'])) {
         $hashed = password_hash($password, PASSWORD_DEFAULT);
         $sql = "INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, 'active')";
         $pdo->prepare($sql)->execute([$username, $email, $hashed, $role]);
-
         $new_id = $pdo->lastInsertId();
         log_user_action($pdo, $new_id, 'Account Created');
-
         echo "<script>window.location.href='?page=users';</script>";
     }
 }
 
-// 2. SECURE ACTIVATE EXECUTION (Password Required)
-// (Replaced the old GET logic with this secure POST logic)
+// 2. SECURE ACTIVATE / APPROVE
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_activate'])) {
     $target_id = $_POST['target_id'];
     $admin_pass = $_POST['admin_password'];
     $admin_id = $_SESSION['user_id'];
 
-    // Verify Admin Password
     $adm = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $adm->execute([$admin_id]);
     $real_hash = $adm->fetchColumn();
@@ -56,13 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_activat
     if (password_verify($admin_pass, $real_hash)) {
         $pdo->prepare("UPDATE users SET status = 'active' WHERE id = ?")->execute([$target_id]);
         log_user_action($pdo, $target_id, 'Account Activated');
-        echo "<script>alert('User activated successfully.'); window.location.href='?page=users';</script>";
+        echo "<script>alert('User approved/activated successfully.'); window.location.href='?page=users';</script>";
     } else {
         echo "<script>alert('Error: Incorrect Admin Password.');</script>";
     }
 }
 
-// 3. SECURE SUSPEND EXECUTION (Password Required)
+// 3. SECURE SUSPEND
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_suspend'])) {
     $target_id = $_POST['target_id'];
     $admin_pass = $_POST['admin_password'];
@@ -71,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_suspend
     $chk = $pdo->prepare("SELECT role FROM users WHERE id = ?");
     $chk->execute([$target_id]);
     $target_role = $chk->fetchColumn();
-
     $adm = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $adm->execute([$admin_id]);
     $real_hash = $adm->fetchColumn();
@@ -91,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_suspend
     }
 }
 
-// 4. SECURE DELETE EXECUTION (Password Required)
+// 4. SECURE DELETE / REJECT
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_delete'])) {
     $target_id = $_POST['target_id'];
     $admin_pass = $_POST['admin_password'];
@@ -100,7 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_delete'
     $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
     $stmt->execute([$target_id]);
     $target_role = $stmt->fetchColumn();
-
     $adm = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $adm->execute([$admin_id]);
     $real_hash = $adm->fetchColumn();
@@ -113,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_secure_delete'
         } else {
             $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$target_id]);
             $pdo->prepare("DELETE FROM user_logs WHERE user_id = ?")->execute([$target_id]);
-            echo "<script>alert('User deleted successfully.'); window.location.href='?page=users';</script>";
+            echo "<script>alert('User deleted/rejected successfully.'); window.location.href='?page=users';</script>";
         }
     } else {
         echo "<script>alert('Error: Incorrect Admin Password.');</script>";
@@ -125,6 +117,7 @@ $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 $sql = "SELECT * FROM users ";
 if ($filter == 'active') $sql .= "WHERE status = 'active' ";
 if ($filter == 'suspended') $sql .= "WHERE status = 'suspended' ";
+if ($filter == 'pending') $sql .= "WHERE status = 'pending' "; // New Filter
 $sql .= "ORDER BY id DESC";
 $users = $pdo->query($sql)->fetchAll();
 
@@ -132,38 +125,26 @@ $users = $pdo->query($sql)->fetchAll();
 $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
 $total_active = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'active'")->fetchColumn();
 $total_suspended = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'suspended'")->fetchColumn();
+$total_pending = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'pending'")->fetchColumn(); // New Stat
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 ?>
 
 <?php if ($action == 'add'): ?>
     <div class="form-container">
-        <div class="form-header">
-            <a href="?page=users" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+        <div class="form-header"><a href="?page=users" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
             <h2>Create New User</h2>
         </div>
         <div class="card" style="text-align:left;">
             <form method="POST" style="display:flex; flex-direction:column; gap:15px;">
-                <label style="color:#aaa;">Username</label>
-                <input type="text" name="username" placeholder="e.g. FarmManager" required autocomplete="off">
-
-                <label style="color:#aaa;">Email Address</label>
-                <input type="email" name="email" placeholder="user@ezonifarm.com" required autocomplete="off">
-
+                <label style="color:#aaa;">Username</label><input type="text" name="username" placeholder="e.g. FarmManager" required autocomplete="off">
+                <label style="color:#aaa;">Email Address</label><input type="email" name="email" placeholder="user@ezonifarm.com" required autocomplete="off">
                 <label style="color:#aaa;">Password</label>
-                <div class="password-wrapper" style="margin-bottom:0;">
-                    <input type="password" name="password" placeholder="Secure Password" required autocomplete="new-password">
-                    <button type="button" class="toggle-password-btn" onclick="togglePassword(this)">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                </div>
-
-                <label style="color:#aaa;">Role / Access Level</label>
-                <select name="role" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555; padding:12px; border-radius:5px;">
+                <div class="password-wrapper" style="margin-bottom:0;"><input type="password" name="password" placeholder="Secure Password" required autocomplete="new-password"><button type="button" class="toggle-password-btn" onclick="togglePassword(this)"><i class="fas fa-eye"></i></button></div>
+                <label style="color:#aaa;">Role / Access Level</label><select name="role" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555; padding:12px; border-radius:5px;">
                     <option value="user">User (Standard Access)</option>
                     <option value="admin">Admin (Full Control)</option>
                 </select>
-
                 <button type="submit" name="add_user" style="background:#4CAF50; margin-top:10px;">+ Create Account</button>
             </form>
         </div>
@@ -172,23 +153,17 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 <?php elseif ($action == 'history'): ?>
     <?php
     $hist_id = $_GET['id'];
-
-    // Get User Name
     $u_stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
     $u_stmt->execute([$hist_id]);
     $u_name = $u_stmt->fetchColumn();
-
-    // Get Logs
     $l_stmt = $pdo->prepare("SELECT * FROM user_logs WHERE user_id = ? ORDER BY log_date DESC");
     $l_stmt->execute([$hist_id]);
     $logs = $l_stmt->fetchAll();
     ?>
     <div class="form-container" style="max-width: 800px;">
-        <div class="form-header">
-            <a href="?page=users" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+        <div class="form-header"><a href="?page=users" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
             <h2>📜 History: <?php echo htmlspecialchars($u_name); ?></h2>
         </div>
-
         <div class="card" style="border-top: 3px solid #FF9800;">
             <div class="table-responsive">
                 <table class="data-table">
@@ -202,33 +177,21 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <tbody>
                         <?php foreach ($logs as $log): ?>
                             <tr>
-                                <td data-label="Date" style="color:#aaa;">
-                                    <?php echo date('d M, H:i', strtotime($log['log_date'])); ?>
-                                </td>
+                                <td data-label="Date" style="color:#aaa;"><?php echo date('d M, H:i', strtotime($log['log_date'])); ?></td>
                                 <td data-label="Action">
-                                    <?php if ($log['action_type'] == 'Blocked Login Attempt'): ?>
-                                        <span class="badge badge-red">⚠️ Blocked Login</span>
-                                    <?php elseif (strpos($log['action_type'], 'Created') !== false): ?>
-                                        <span class="badge badge-blue">✨ Created</span>
-                                    <?php elseif (strpos($log['action_type'], 'Suspended') !== false): ?>
-                                        <span class="badge badge-red">🚫 Suspended</span>
-                                    <?php elseif (strpos($log['action_type'], 'Activated') !== false): ?>
-                                        <span class="badge badge-green">✅ Activated</span>
-                                    <?php else: ?>
-                                        <span class="badge badge-orange"><?php echo $log['action_type']; ?></span>
-                                    <?php endif; ?>
+                                    <?php if ($log['action_type'] == 'Blocked Login Attempt'): ?><span class="badge badge-red">⚠️ Blocked Login</span>
+                                    <?php elseif (strpos($log['action_type'], 'Created') !== false): ?><span class="badge badge-blue">✨ Created</span>
+                                    <?php elseif (strpos($log['action_type'], 'Suspended') !== false): ?><span class="badge badge-red">🚫 Suspended</span>
+                                    <?php elseif (strpos($log['action_type'], 'Activated') !== false): ?><span class="badge badge-green">✅ Activated</span>
+                                    <?php elseif ($log['action_type'] == 'Registration Request'): ?><span class="badge badge-orange">⏳ Requested</span>
+                                    <?php else: ?><span class="badge badge-orange"><?php echo $log['action_type']; ?></span><?php endif; ?>
                                 </td>
-                                <td data-label="By">
-                                    <span style="font-weight:bold; color:#fff;"><?php echo htmlspecialchars($log['performed_by']); ?></span>
-                                </td>
+                                <td data-label="By"><span style="font-weight:bold; color:#fff;"><?php echo htmlspecialchars($log['performed_by']); ?></span></td>
                             </tr>
                         <?php endforeach; ?>
-
-                        <?php if (empty($logs)): ?>
-                            <tr>
+                        <?php if (empty($logs)): ?><tr>
                                 <td colspan="3" style="text-align:center; padding:30px; color:#666;">No history recorded yet.</td>
-                            </tr>
-                        <?php endif; ?>
+                            </tr><?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -242,7 +205,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     $chk->execute([$target_id]);
     $target_name = $chk->fetchColumn();
 
-    // --- NEW LOGIC: Switch between 3 modes (Delete, Suspend, Activate) ---
     if ($action == 'confirm_delete') {
         $color = '#ff4b4b';
         $title = 'Delete User?';
@@ -255,10 +217,10 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
         $btn_text = 'Yes, Suspend User';
         $icon = 'fa-ban';
         $post_name = 'confirm_secure_suspend';
-    } else { // confirm_activate
+    } else {
         $color = '#4CAF50';
-        $title = 'Activate User?';
-        $btn_text = 'Yes, Activate User';
+        $title = 'Approve User?';
+        $btn_text = 'Yes, Approve User';
         $icon = 'fa-check-circle';
         $post_name = 'confirm_secure_activate';
     }
@@ -273,10 +235,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
             <p style="color:#aaa; font-size:0.9rem; margin-bottom:20px;">Enter Admin Password to confirm.</p>
             <form method="POST">
                 <input type="hidden" name="target_id" value="<?php echo $target_id; ?>">
-                <div class="password-wrapper" style="margin-bottom:20px; text-align:left;">
-                    <input type="password" name="admin_password" placeholder="Admin Password" required style="border:1px solid <?php echo $color; ?>;">
-                    <button type="button" class="toggle-password-btn" onclick="togglePassword(this)"><i class="fas fa-eye"></i></button>
-                </div>
+                <div class="password-wrapper" style="margin-bottom:20px; text-align:left;"><input type="password" name="admin_password" placeholder="Admin Password" required style="border:1px solid <?php echo $color; ?>;"><button type="button" class="toggle-password-btn" onclick="togglePassword(this)"><i class="fas fa-eye"></i></button></div>
                 <button type="submit" name="<?php echo $post_name; ?>" style="background:<?php echo $color; ?>; width:100%; font-weight:bold;"><?php echo $btn_text; ?></button>
             </form>
         </div>
@@ -327,6 +286,15 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <div class="sub-text">Can Login</div>
             </div>
         </a>
+
+        <a href="?page=users&filter=pending" style="text-decoration:none;">
+            <div class="metric-card" style="border-left:4px solid #FF9800; <?php echo ($total_pending > 0) ? 'background: rgba(255,152,0,0.15);' : ''; ?> transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4 style="<?php echo ($total_pending > 0) ? 'color:#FF9800; font-weight:bold;' : ''; ?>">Pending</h4>
+                <div class="value" style="color:#FF9800;"><?php echo $total_pending; ?></div>
+                <div class="sub-text"><?php echo ($total_pending > 0) ? 'Needs Approval' : 'No requests'; ?></div>
+            </div>
+        </a>
+
         <a href="?page=users&filter=suspended" style="text-decoration:none;">
             <div class="metric-card" style="border-left:4px solid #ff4b4b; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4>Suspended</h4>
@@ -356,53 +324,37 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <tbody>
                     <?php foreach ($users as $u): ?>
                         <?php
-                        // CHECK FOR RECENT BLOCKED ATTEMPTS
                         $alert_sql = "SELECT id FROM user_logs WHERE user_id = ? AND action_type = 'Blocked Login Attempt' AND log_date > (NOW() - INTERVAL 1 DAY)";
                         $stmt = $pdo->prepare($alert_sql);
                         $stmt->execute([$u['id']]);
                         $has_attempt = $stmt->rowCount() > 0;
                         ?>
                         <tr>
-                            <td data-label="Username">
-                                <strong><?php echo htmlspecialchars($u['username']); ?></strong>
-                                <?php if ($u['id'] == $_SESSION['user_id']) echo " <small style='color:#4CAF50'>(You)</small>"; ?>
-                            </td>
-
-                            <td data-label="Email" style="color:#aaa; font-size:0.9rem;">
-                                <?php echo htmlspecialchars($u['email']); ?>
-                            </td>
-
-                            <td data-label="Role">
-                                <span class="badge <?php echo ($u['role'] == 'admin') ? 'badge-blue' : 'badge-orange'; ?>">
-                                    <?php echo ucfirst($u['role']); ?>
-                                </span>
-                            </td>
-
+                            <td data-label="Username"><strong><?php echo htmlspecialchars($u['username']); ?></strong><?php if ($u['id'] == $_SESSION['user_id']) echo " <small style='color:#4CAF50'>(You)</small>"; ?></td>
+                            <td data-label="Email" style="color:#aaa; font-size:0.9rem;"><?php echo htmlspecialchars($u['email']); ?></td>
+                            <td data-label="Role"><span class="badge <?php echo ($u['role'] == 'admin') ? 'badge-blue' : 'badge-orange'; ?>"><?php echo ucfirst($u['role']); ?></span></td>
                             <td data-label="Status">
-                                <span class="badge <?php echo ($u['status'] == 'active') ? 'badge-green' : 'badge-red'; ?>">
-                                    <?php echo ucfirst($u['status']); ?>
-                                </span>
-                                <?php if ($u['status'] == 'suspended' && $has_attempt): ?>
-                                    <br><span class="login-alert">⚠️ Trying to Access</span>
-                                <?php endif; ?>
+                                <span class="badge <?php echo ($u['status'] == 'active') ? 'badge-green' : (($u['status'] == 'pending') ? 'badge-orange' : 'badge-red'); ?>"><?php echo ucfirst($u['status']); ?></span>
+                                <?php if ($u['status'] == 'suspended' && $has_attempt): ?><br><span class="login-alert">⚠️ Trying to Access</span><?php endif; ?>
                             </td>
-
                             <td data-label="Action" style="text-align:right;">
                                 <?php if ($u['id'] != $_SESSION['user_id']): ?>
 
-                                    <a href="?page=users&action=history&id=<?php echo $u['id']; ?>" class="badge badge-orange" style="text-decoration:none; margin-right:5px; background:#555; border:1px solid #777;">
-                                        <i class="fas fa-clock"></i>
-                                    </a>
+                                    <a href="?page=users&action=history&id=<?php echo $u['id']; ?>" class="badge badge-orange" style="text-decoration:none; margin-right:5px; background:#555; border:1px solid #777;"><i class="fas fa-clock"></i></a>
 
-                                    <?php if ($u['role'] == 'admin'): ?>
+                                    <?php if ($u['status'] == 'pending'): ?>
+                                        <a href="?page=users&action=confirm_activate&id=<?php echo $u['id']; ?>" class="badge badge-green" style="text-decoration:none; margin-right:5px;">Approve ✅</a>
+                                        <a href="?page=users&action=confirm_delete&id=<?php echo $u['id']; ?>" class="badge badge-red" style="text-decoration:none;">Reject ❌</a>
+
+                                    <?php elseif ($u['role'] == 'admin'): ?>
                                         <span class="badge" style="background:#333; color:#aaa; border:1px solid #555;">Protected 🛡️</span>
+
                                     <?php else: ?>
                                         <?php if ($u['status'] == 'active'): ?>
                                             <a href="?page=users&action=confirm_suspend&id=<?php echo $u['id']; ?>" class="badge badge-orange" style="text-decoration:none; margin-right:5px;">Suspend 🚫</a>
                                         <?php else: ?>
                                             <a href="?page=users&action=confirm_activate&id=<?php echo $u['id']; ?>" class="badge badge-green" style="text-decoration:none; margin-right:5px;">Activate ✅</a>
                                         <?php endif; ?>
-
                                         <a href="?page=users&action=confirm_delete&id=<?php echo $u['id']; ?>" style="color:#ff4b4b;"><i class="fas fa-trash"></i></a>
                                     <?php endif; ?>
 
@@ -412,6 +364,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                             </td>
                         </tr>
                     <?php endforeach; ?>
+                    <?php if (empty($users)): ?><tr>
+                            <td colspan="5" style="text-align:center; padding:30px; color:#666;">No users found.</td>
+                        </tr><?php endif; ?>
                 </tbody>
             </table>
         </div>

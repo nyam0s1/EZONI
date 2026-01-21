@@ -1,7 +1,6 @@
 /* =========================================
    0. FONT IMPORT (The "Apple Look")
    ========================================= */
-/* Importing 'Inter' - The closest open-source match to Apple's San Francisco */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* =========================================
@@ -10,7 +9,6 @@
 html {
     font-size: 16px;
     color-scheme: dark;
-    /* Tells browser we handle dark mode */
 }
 
 @media (max-width: 1024px) {
@@ -32,13 +30,12 @@ html {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    /* HERE IS THE MAGIC SWITCH: */
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* LOGIN PAGE THEME */
 body.login-body {
-    background: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)),
+    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
         url("https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?q=80&w=2940&auto=format&fit=crop");
     background-size: cover;
     background-position: center;
@@ -49,12 +46,36 @@ body.login-body {
     color: white;
     padding: 20px;
     background-color: #0e1117 !important;
-    /* Force Dark Mode */
+}
+
+/* =========================================
+   LOGIN & REGISTER CONTAINER (Crystal Clear / Minimal Frost)
+   ========================================= */
+.login-container {
+    /* 1. BACKGROUND: Very faint tint just for text contrast */
+    background: rgba(0, 0, 0, 0.15); 
+    
+    /* 2. BLUR: TINY amount. Just enough to separate layers, but mostly clear. */
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    
+    /* 3. BORDER: Thin and crisp */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    
+    /* 4. SHADOW: Deep shadow to lift it off the background */
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+    
+    /* Shape */
+    padding: 40px 30px;
+    border-radius: 30px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
 }
 
 /* DASHBOARD THEME */
 body.dashboard-body {
-    background: linear-gradient(rgba(14, 17, 23, 0.92), rgba(14, 17, 23, 0.92)),
+    background: linear-gradient(rgba(14, 17, 23, 0.75), rgba(14, 17, 23, 0.75)),
         url("https://images.unsplash.com/photo-1444858291040-58f756a3bdd6?q=80&w=2500&auto=format&fit=crop");
     background-size: cover;
     background-position: center;
@@ -64,18 +85,19 @@ body.dashboard-body {
     height: 100vh;
     overflow: hidden;
     background-color: #0e1117 !important;
-    /* Force Dark Mode */
 }
 
 /* =========================================
-   3. SIDEBAR (RETRACTABLE)
+   3. SIDEBAR (RETRACTABLE) - GLASS
    ========================================= */
 .sidebar {
     width: 250px;
-    background-color: rgba(38, 39, 48, 0.95);
+    background-color: rgba(20, 23, 30, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
     transition: all 0.3s ease;
     flex-shrink: 0;
     padding-top: 0;
@@ -83,22 +105,20 @@ body.dashboard-body {
     z-index: 100;
 }
 
-/* Sidebar Profile */
 .sidebar-profile {
     padding: 20px;
     text-align: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     margin-bottom: 10px;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .sidebar-profile small {
     display: block;
-    color: #888;
+    color: #aaa;
     font-size: 0.8rem;
     margin-bottom: 5px;
     font-weight: 500;
-    /* Made slightly bolder for readability */
 }
 
 .sidebar-profile h3 {
@@ -106,7 +126,7 @@ body.dashboard-body {
     font-size: 1.1rem;
     margin: 0 0 5px 0;
     font-weight: 700;
-    /* Stronger heading */
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .role-badge-small {
@@ -116,10 +136,8 @@ body.dashboard-body {
     border-radius: 10px;
     color: #ccc;
     letter-spacing: 0.5px;
-    /* Clean tracking */
 }
 
-/* Hamburger Toggle Button */
 .sidebar-toggle {
     background: none;
     border: none;
@@ -138,7 +156,6 @@ body.dashboard-body {
     color: white;
 }
 
-/* Collapsed State */
 .sidebar.collapsed {
     width: 70px;
     padding-top: 60px;
@@ -167,10 +184,9 @@ body.dashboard-body {
     font-size: 1.3rem;
 }
 
-/* Links */
 .nav-link {
     text-decoration: none;
-    color: #c0c0c0;
+    color: #ccc;
     padding: 12px 20px;
     display: flex;
     align-items: center;
@@ -179,7 +195,6 @@ body.dashboard-body {
     border-left: 4px solid transparent;
     white-space: nowrap;
     font-weight: 500;
-    /* Smoother text weight */
 }
 
 .nav-link i {
@@ -190,9 +205,10 @@ body.dashboard-body {
 
 .nav-link:hover,
 .nav-link.active {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.1);
     color: white;
     border-left-color: #4CAF50;
+    backdrop-filter: blur(5px);
 }
 
 .logout-btn {
@@ -206,7 +222,6 @@ body.dashboard-body {
     border-left-color: #ff4b4b;
 }
 
-/* Mobile Close Button */
 .mobile-close-btn {
     display: none;
 }
@@ -222,13 +237,13 @@ body.dashboard-body {
     position: relative;
 }
 
-/* Sticky Top Bar */
 .top-bar {
     position: sticky;
     top: 0;
     z-index: 99;
-    background: rgba(14, 17, 23, 0.95);
-    backdrop-filter: blur(10px);
+    background: rgba(14, 17, 23, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     margin: 0 -30px 30px -30px;
     padding: 15px 30px;
@@ -241,10 +256,8 @@ body.dashboard-body {
 .brand-title {
     font-size: 2rem;
     font-weight: 800;
-    /* Extra bold for impact */
     text-transform: uppercase;
     letter-spacing: 2px;
-    /* Tighter spacing for modern look */
     margin: 0;
     background: linear-gradient(90deg, #FFD700, #4CAF50, #FFD700);
     background-size: 200% auto;
@@ -261,21 +274,28 @@ body.dashboard-body {
 }
 
 /* =========================================
-   5. COMPONENTS
+   5. COMPONENTS - CARDS
    ========================================= */
 .card,
 .metric-card {
-    background: rgba(38, 39, 48, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    background: rgba(30, 33, 40, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
     padding: 25px;
-    border-radius: 12px;
-    /* Slightly rounder corners like Apple */
+    border-radius: 16px;
     margin-bottom: 20px;
 }
 
 .metric-card {
     padding: 20px;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.metric-card:hover {
+    background: rgba(40, 44, 52, 0.8);
+    transform: translateY(-3px);
 }
 
 .metric-card h4 {
@@ -290,7 +310,7 @@ body.dashboard-body {
     font-weight: 700;
     color: white;
     letter-spacing: -0.5px;
-    /* Tighter numbers */
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .metric-card .sub-text {
@@ -306,7 +326,6 @@ body.dashboard-body {
     margin-bottom: 30px;
 }
 
-/* Tables */
 .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -320,7 +339,7 @@ body.dashboard-body {
     background: rgba(0, 0, 0, 0.3);
     color: #ccc;
     font-weight: 600;
-    border-bottom: 2px solid #444;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
 }
 
 .data-table td {
@@ -331,10 +350,9 @@ body.dashboard-body {
 }
 
 .data-table tr:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Forms */
 .form-container {
     max-width: 600px;
     margin: 40px auto;
@@ -362,14 +380,19 @@ body.dashboard-body {
 input,
 select {
     padding: 12px;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.3);
     color: white;
-    border: 1px solid #555;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
-    /* Rounder inputs */
     width: 100%;
     outline: none;
     font-size: 0.95rem;
+}
+
+input:focus,
+select:focus {
+    border-color: #4CAF50;
+    background: rgba(0, 0, 0, 0.5);
 }
 
 button {
@@ -382,7 +405,6 @@ button {
     letter-spacing: 0.5px;
 }
 
-/* Badges */
 .badge {
     padding: 4px 10px;
     border-radius: 6px;
@@ -415,7 +437,6 @@ button {
     color: #fff;
 }
 
-/* Account Deletion Link */
 .delete-account-link {
     color: #666;
     text-decoration: none;
@@ -431,7 +452,6 @@ button {
     background: rgba(255, 75, 75, 0.1);
 }
 
-/* Settings Tabs */
 .tab-container {
     margin-bottom: 20px;
 }
@@ -456,7 +476,7 @@ button {
 .tab-btn.active {
     color: #4CAF50;
     border-bottom-color: #4CAF50;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .tab-content {
@@ -488,9 +508,6 @@ button {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* =========================================
-   6. MOBILE RESPONSIVENESS (Admin Side)
-   ========================================= */
 .mobile-toggle {
     display: none;
 }
@@ -506,6 +523,7 @@ button {
     .sidebar.mobile-open {
         left: 0;
         width: 250px;
+        background-color: rgba(20, 23, 30, 0.95);
     }
 
     .sidebar-toggle {
@@ -547,7 +565,6 @@ button {
         padding: 15px;
     }
 
-    /* Responsive Tables (Card View) */
     .data-table thead {
         display: none;
     }
@@ -584,9 +601,6 @@ button {
     }
 }
 
-/* =========================================
-   7. LAUNCHPAD / HOME GRID STYLES
-   ========================================= */
 .launchpad-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -596,7 +610,9 @@ button {
 }
 
 .app-card {
-    background: rgba(38, 39, 48, 0.6);
+    background: rgba(30, 33, 40, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 20px;
     padding: 30px 20px;
@@ -613,7 +629,7 @@ button {
 
 .app-card:hover {
     transform: translateY(-5px);
-    background: rgba(38, 39, 48, 0.9);
+    background: rgba(40, 44, 52, 0.8);
     border-color: rgba(255, 255, 255, 0.2);
 }
 
@@ -683,9 +699,6 @@ button {
     color: white;
 }
 
-/* =========================================
-   8. FORCE FORM BUTTONS TO THE RIGHT
-   ========================================= */
 .card form button {
     width: auto !important;
     align-self: flex-end !important;
@@ -700,41 +713,65 @@ button {
 }
 
 /* =========================================
-   9. PASSWORD TOGGLE - ROBUST FIX
+   9. PASSWORD TOGGLE - FIXED & SECURE
    ========================================= */
 .password-wrapper {
     position: relative;
     width: 100%;
     margin-bottom: 20px;
+    display: flex;
+    /* Ensures correct alignment context */
+    align-items: center;
 }
 
-.password-wrapper input {
-    width: 100%;
-    padding-right: 45px !important;
+/* 1. The Input Field - SAFETY ZONE */
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
+    width: 100% !important;
+    /* Huge padding to ensure text NEVER touches the icon */
+    padding-right: 60px !important;
     margin-bottom: 0 !important;
-    box-sizing: border-box;
+    box-sizing: border-box !important;
+    height: 45px !important;
+    /* Force standard height */
 }
 
+/* 2. The Eye Button - ANCHORED RIGHT */
 .password-wrapper .toggle-password-btn {
     position: absolute !important;
-    top: 50% !important;
-    right: 15px !important;
-    transform: translateY(-50%) !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    /* Stick to the very edge */
+    margin: auto !important;
+    /* Vertically center */
 
-    width: auto !important;
-    height: auto !important;
+    height: 40px !important;
+    /* Fits inside the input */
+    width: 40px !important;
+    /* Standard touch target */
+
+    /* Override any global button styles */
+    min-width: 0 !important;
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    margin: 0 !important;
+    box-shadow: none !important;
 
+    /* Icon Styling */
     color: #888 !important;
     cursor: pointer;
-    z-index: 10;
+    z-index: 100;
+    /* Ensure it sits on top of text */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 1rem !important;
 }
 
+/* Hover Effect */
 .password-wrapper .toggle-password-btn:hover {
     color: #4CAF50 !important;
-    transform: translateY(-50%) scale(1.1) !important;
+    transform: none !important;
+    /* Stop any weird shifting */
 }
