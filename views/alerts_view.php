@@ -38,7 +38,7 @@ try {
 <div class="form-container" style="max-width: 1000px;">
     <div class="form-header">
         <?php $dashboard = ($_SESSION['role'] == 'admin') ? 'admin_dashboard.php' : 'user_dashboard.php'; ?>
-        <a href="<?php echo $dashboard; ?>?page=overview" class="back-btn"><i class="fas fa-arrow-left"></i> Dashboard</a>
+        <a href="<?php echo $dashboard; ?>?page=overview" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
         <h2 style="color:#ff4b4b;">⚠️ Attention Needed</h2>
     </div>
 
