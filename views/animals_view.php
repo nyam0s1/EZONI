@@ -1,26 +1,33 @@
 <?php
 
 /**
- * ANIMALS VIEW - FIXED BREED LOGIC
- * - Feature: 'Breed' field added to Add, Edit, and View Table.
- * - Fix: Backend now correctly saves and updates the breed.
+ * ANIMALS VIEW - UPDATED
+ * - Feature: 'Breed' field included.
+ * - Feature: 'Buying Price' (Cost) added to Registration, Edit, and Table.
  */
 
 // --- BACKEND LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
     try {
-        // FIXED: Added 'breed' to the INSERT query
-        $stmt = $pdo->prepare("INSERT INTO animals (tag_id, name, species, gender, breed, mother_id) VALUES (?, ?, ?, ?, ?, ?)");
+        // NEW: Capture the cost (default to 0 if empty)
+        $cost = !empty($_POST['buying_price']) ? floatval($_POST['buying_price']) : 0.00;
+
+        // FIXED: Added 'buying_price' to INSERT query
+        $stmt = $pdo->prepare("INSERT INTO animals (tag_id, name, species, gender, breed, buying_price, mother_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['tag_id'],
             $_POST['name'],
             $_POST['species'],
             $_POST['gender'],
-            $_POST['breed'], // <--- New Field
+            $_POST['breed'],
+            $cost, // <--- New Value
             $_POST['mother_id'] ?: NULL
         ]);
 
-        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, user) VALUES (?, 'Registered', ?)")->execute([$_POST['tag_id'], $_SESSION['username']]);
+        // Log includes the cost now
+        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Registered', ?, ?)")
+            ->execute([$_POST['tag_id'], "Initial Value: KES $cost", $_SESSION['username']]);
+
         echo "<script>window.location.href='?page=animals';</script>";
     } catch (PDOException $e) {
         echo "<script>alert('Error: Tag ID already exists');</script>";
@@ -29,13 +36,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_animal'])) {
     $mother_id = $_POST['mother_id'] ?: NULL;
-    // FIXED: Added 'breed' to the UPDATE query (It was missing before!)
-    $pdo->prepare("UPDATE animals SET tag_id = ?, name = ?, species = ?, breed = ?, mother_id = ? WHERE id = ?")
+    $cost = floatval($_POST['buying_price']);
+
+    // FIXED: Added 'buying_price' to UPDATE query
+    $pdo->prepare("UPDATE animals SET tag_id = ?, name = ?, species = ?, breed = ?, buying_price = ?, mother_id = ? WHERE id = ?")
         ->execute([
             $_POST['tag_id'],
             $_POST['name'],
             $_POST['species'],
-            $_POST['breed'], // <--- New Field 
+            $_POST['breed'],
+            $cost, // <--- New Value
             $mother_id,
             $_POST['id']
         ]);
@@ -86,7 +96,10 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     </select>
                 </div>
 
-                <input type="text" name="breed" placeholder="Breed (e.g. Friesian)" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
+                <div style="display:flex; gap:10px;">
+                    <input type="text" name="breed" placeholder="Breed (e.g. Friesian)" style="flex:1; background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
+                    <input type="number" step="0.01" name="buying_price" placeholder="Cost / Value (KES)" style="flex:1; background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
+                </div>
 
                 <select name="mother_id" id="mother_id" style="padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
                     <option value="">-- Mother (Optional) --</option>
@@ -144,8 +157,16 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <div style="flex:1;"><label style="color:#aaa;">Gender (Fixed)</label><input type="text" value="<?php echo $animal['gender']; ?>" disabled style="background:#333; color:#888; border:1px solid #444;"></div>
                 </div>
 
-                <label style="color:#aaa;">Breed</label>
-                <input type="text" name="breed" value="<?php echo $animal['breed']; ?>">
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="color:#aaa;">Breed</label>
+                        <input type="text" name="breed" value="<?php echo $animal['breed']; ?>">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:#aaa;">Acquisition Cost (KES)</label>
+                        <input type="number" step="0.01" name="buying_price" value="<?php echo $animal['buying_price']; ?>">
+                    </div>
+                </div>
 
                 <label style="color:#aaa;">Mother</label>
                 <select name="mother_id" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
@@ -241,6 +262,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <th>Name</th>
                         <th>Species</th>
                         <th>Breed</th>
+                        <th>Cost</th>
                         <th>Mother</th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
@@ -252,8 +274,11 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                             <td data-label="Tag"><?php echo htmlspecialchars($a['tag_id']); ?></td>
                             <td data-label="Name"><?php echo htmlspecialchars($a['name']); ?></td>
                             <td data-label="Species"><?php echo htmlspecialchars($a['species']); ?></td>
-
                             <td data-label="Breed" style="color:#ccc;"><?php echo !empty($a['breed']) ? htmlspecialchars($a['breed']) : '-'; ?></td>
+
+                            <td data-label="Cost" style="color:#4CAF50; font-weight:bold;">
+                                <?php echo ($a['buying_price'] > 0) ? number_format($a['buying_price']) : '-'; ?>
+                            </td>
 
                             <td data-label="Mother" style="color:#aaa;"><?php echo $a['mother_name'] ? htmlspecialchars($a['mother_name']) : '-'; ?></td>
                             <td data-label="Status"><span class="<?php echo ($a['status'] == 'Active') ? 'badge badge-green' : 'badge badge-red'; ?>"><?php echo $a['status']; ?></span></td>
