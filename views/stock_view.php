@@ -1,10 +1,11 @@
 <?php
 
 /**
- * STOCK VIEW - FINAL POLISHED
- * - Feature: "Add Item" has live Cost Calculator (Qty * Unit Price = Total).
+ * STOCK VIEW - FINAL POLISHED (WITH MEMORY)
+ * - Feature: "Add Item" has live Cost Calculator.
+ * - Feature: "Restock" remembers the Last Purchase Price automatically.
  * - Feature: "Restock" has Smart Source Toggle (Purchase vs Harvest).
- * - Reporting: All costs (Creation & Restocking) appear in Daily Reports.
+ * - Reporting: All costs appear in Daily Reports.
  */
 
 // --- BACKEND LOGIC ---
@@ -22,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_stock'])) {
     $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $threshold]);
     $id = $pdo->lastInsertId();
 
-    // Log creation (This ensures it shows in Reports)
+    // Log creation
     $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, user) VALUES (?, ?, 'Created', ?, ?, ?, ?, ?)")
         ->execute([$id, $_POST['name'], $_POST['quantity'], $_POST['unit'], $unit_cost, $total_cost, $_SESSION['username']]);
 
@@ -168,6 +169,12 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     $i = $pdo->prepare("SELECT * FROM stock WHERE id = ?");
     $i->execute([$_GET['id']]);
     $item = $i->fetch();
+
+    // FETCH LAST KNOWN PRICE (Logic added here)
+    $stmt_price = $pdo->prepare("SELECT unit_cost FROM stock_logs WHERE item_id = ? AND unit_cost > 0 ORDER BY id DESC LIMIT 1");
+    $stmt_price->execute([$item['id']]);
+    $last_price = $stmt_price->fetchColumn();
+    $prefill_price = $last_price ? $last_price : '';
     ?>
     <div class="form-container">
         <div class="form-header"><a href="?page=stock" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
@@ -201,7 +208,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <div style="flex:1;">
                         <label id="cost_label" style="display:block; margin-bottom:5px; color:#ccc;">Cost per Unit</label>
 
-                        <input type="number" step="0.01" name="unit_cost_input" id="unit_cost_input" placeholder="Price per item" oninput="calcCost()">
+                        <input type="number" step="0.01" name="unit_cost_input" id="unit_cost_input"
+                            value="<?php echo $prefill_price; ?>"
+                            placeholder="Price per item" oninput="calcCost()">
 
                         <input type="number" step="0.01" name="total_cost_input" id="total_cost_input" placeholder="Total Expense" style="display:none;" oninput="calcCost()">
                     </div>
@@ -228,7 +237,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 document.getElementById('cost_label').innerText = isHarvest ? 'Total Production Cost' : 'Cost per Unit';
                 document.getElementById('summary_text').innerText = isHarvest ? 'Recorded Value:' : 'Total Expense:';
 
-                document.getElementById('unit_cost_input').value = '';
+                // IMPORTANT: Removed line that clears unit_cost_input so the prefilled price stays
                 document.getElementById('total_cost_input').value = '';
                 document.getElementById('display_total').innerText = '0.00';
 
