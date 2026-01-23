@@ -1,28 +1,28 @@
 <?php
 
 /**
- * STOCK VIEW - FINAL COMPLETE
- * - Feature: "Add Item" now asks for Initial Cost.
- * - Feature: "Restock" has Purchase vs Harvest toggle.
- * - Feature: "Low Stock" & "History" reports included.
+ * STOCK VIEW - FINAL POLISHED
+ * - Feature: "Add Item" has live Cost Calculator (Qty * Unit Price = Total).
+ * - Feature: "Restock" has Smart Source Toggle (Purchase vs Harvest).
+ * - Reporting: All costs (Creation & Restocking) appear in Daily Reports.
  */
 
 // --- BACKEND LOGIC ---
 
-// 1. ADD NEW ITEM (Updated with Cost)
+// 1. ADD NEW ITEM (With Cost Logic)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_stock'])) {
     $threshold = !empty($_POST['min_threshold']) ? intval($_POST['min_threshold']) : 10;
 
     // Calculate Initial Value
     $qty = floatval($_POST['quantity']);
-    $unit_cost = floatval($_POST['unit_cost']); // <--- New: Capture Initial Cost
-    $total_cost = $qty * $unit_cost;
+    $unit_cost = floatval($_POST['unit_cost']);
+    $total_cost = $qty * $unit_cost; // Backend verification
 
     $stmt = $pdo->prepare("INSERT INTO stock (name, quantity, unit, category, min_threshold) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $threshold]);
     $id = $pdo->lastInsertId();
 
-    // Log creation with Cost Data
+    // Log creation (This ensures it shows in Reports)
     $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, user) VALUES (?, ?, 'Created', ?, ?, ?, ?, ?)")
         ->execute([$id, $_POST['name'], $_POST['quantity'], $_POST['unit'], $unit_cost, $total_cost, $_SESSION['username']]);
 
@@ -37,29 +37,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_stock']) && $_SES
     echo "<script>window.location.href='?page=stock';</script>";
 }
 
-// 3. SUBMIT RESTOCK (Smart Logic: Purchase vs Harvest)
+// 3. SUBMIT RESTOCK
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_restock'])) {
     $qty = floatval($_POST['quantity']);
-    $source = $_POST['source_type'] ?? 'purchase'; // Default to purchase if missing
+    $source = $_POST['source_type'] ?? 'purchase';
 
-    // LOGIC: Calculate Cost based on Source
     if ($source === 'harvest') {
-        // Harvest: User inputs TOTAL cost (Labor+Seeds), we calculate Unit Cost
+        // Harvest: Total is manual, Unit Cost is calculated
         $total = floatval($_POST['total_cost_input']);
         $cost = ($qty > 0) ? ($total / $qty) : 0;
         $action_label = 'Harvested';
     } else {
-        // Purchase: User inputs UNIT cost, we calculate Total
+        // Purchase: Unit Cost is manual, Total is calculated
         $cost = floatval($_POST['unit_cost_input']);
         $total = $qty * $cost;
         $action_label = 'Restocked';
     }
 
     if ($qty > 0) {
-        // A. Update Stock Level
         $pdo->prepare("UPDATE stock SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-
-        // B. Log it with the correct Action Label & Cost Data
         $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, user) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
             ->execute([$_POST['id'], $_POST['name'], $action_label, $qty, $_POST['unit'], $cost, $total, $_SESSION['username']]);
 
@@ -114,7 +110,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1;">
                         <label style="color:#aaa;">Quantity</label>
-                        <input type="number" step="0.01" name="quantity" value="<?php echo $is_edit ? $item['quantity'] : ''; ?>" placeholder="Qty" required <?php echo $is_edit ? 'readonly style="opacity:0.6"' : ''; ?>>
+                        <input type="number" step="0.01" name="quantity" id="init_qty" value="<?php echo $is_edit ? $item['quantity'] : ''; ?>" placeholder="Qty" required <?php echo $is_edit ? 'readonly style="opacity:0.6"' : ''; ?> oninput="calcInitTotal()">
                     </div>
                     <div style="flex:1;">
                         <label style="color:#aaa;">Unit</label>
@@ -124,9 +120,15 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 </div>
 
                 <?php if (!$is_edit): ?>
-                    <div style="flex:1;">
-                        <label style="color:#aaa;">Cost per Unit (Initial Stock)</label>
-                        <input type="number" step="0.01" name="unit_cost" placeholder="Price per kg/bag" required style="width:100%; box-sizing:border-box;">
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label style="color:#aaa;">Cost per Unit</label>
+                            <input type="number" step="0.01" name="unit_cost" id="init_cost" placeholder="Price/Unit" required oninput="calcInitTotal()">
+                        </div>
+                        <div style="flex:1; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.2); border-radius:5px; flex-direction:column;">
+                            <span style="font-size:0.8rem; color:#aaa;">Total Value</span>
+                            <strong style="color:#ff4b4b; font-size:1.2rem;">Ksh <span id="init_total">0.00</span></strong>
+                        </div>
                     </div>
                 <?php endif; ?>
 
@@ -151,6 +153,14 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 </button>
             </form>
         </div>
+        <script>
+            function calcInitTotal() {
+                const qty = parseFloat(document.getElementById('init_qty').value) || 0;
+                const cost = parseFloat(document.getElementById('init_cost').value) || 0;
+                const total = qty * cost;
+                document.getElementById('init_total').innerText = total.toFixed(2);
+            }
+        </script>
     </div>
 
 <?php elseif ($action == 'restock' && isset($_GET['id'])): ?>
@@ -213,15 +223,11 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
             function toggleSource() {
                 const isHarvest = document.querySelector('input[name="source_type"][value="harvest"]').checked;
 
-                // Toggle Fields
                 document.getElementById('unit_cost_input').style.display = isHarvest ? 'none' : 'block';
                 document.getElementById('total_cost_input').style.display = isHarvest ? 'block' : 'none';
-
-                // Toggle Labels
                 document.getElementById('cost_label').innerText = isHarvest ? 'Total Production Cost' : 'Cost per Unit';
                 document.getElementById('summary_text').innerText = isHarvest ? 'Recorded Value:' : 'Total Expense:';
 
-                // Reset Values to avoid confusion
                 document.getElementById('unit_cost_input').value = '';
                 document.getElementById('total_cost_input').value = '';
                 document.getElementById('display_total').innerText = '0.00';
@@ -234,11 +240,8 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 const isHarvest = document.querySelector('input[name="source_type"][value="harvest"]').checked;
 
                 if (isHarvest) {
-                    // Logic: User inputs TOTAL, we display that directly
                     const total = parseFloat(document.getElementById('total_cost_input').value) || 0;
                     document.getElementById('display_total').innerText = total.toFixed(2);
-
-                    // Show calculated unit cost
                     if (qty > 0) {
                         document.getElementById('unit_summary').style.display = 'block';
                         document.getElementById('calc_unit_cost').innerText = (total / qty).toFixed(2);
@@ -246,7 +249,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         document.getElementById('unit_summary').style.display = 'none';
                     }
                 } else {
-                    // Logic: User inputs UNIT, we calc Total
                     const unitCost = parseFloat(document.getElementById('unit_cost_input').value) || 0;
                     const total = qty * unitCost;
                     document.getElementById('display_total').innerText = total.toFixed(2);
