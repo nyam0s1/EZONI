@@ -1,8 +1,9 @@
 <?php
 
 /**
- * REPORTS VIEW
- * - Update: "Net Profit" card now smooth-scrolls to the Income Chart.
+ * REPORTS VIEW - FIXED NAVIGATION
+ * - Fix: Replaced JS scrolling with Native HTML Anchors (Works better on mobile).
+ * - Feature: Added CSS smooth-scroll for the whole page.
  */
 
 // ... (Data fetching logic remains exactly the same) ...
@@ -45,6 +46,12 @@ foreach ($chart_data as $Row) {
     $incomes[] = $Row['inc'];
 }
 ?>
+
+<style>
+    html {
+        scroll-behavior: smooth;
+    }
+</style>
 
 <?php if ($action == 'production_report'):
     // ... (Production Report Logic same as before) ...
@@ -122,7 +129,7 @@ foreach ($chart_data as $Row) {
 
     <div class="metrics-grid">
 
-        <a href="#" onclick="event.preventDefault(); document.getElementById('history-table').scrollIntoView({behavior: 'smooth'});" style="text-decoration:none; color:inherit; display:block;">
+        <a href="#history-table" style="text-decoration:none; color:inherit; display:block;">
             <div class="metric-card" style="border-left:4px solid #4CAF50; transition:transform 0.2s; cursor:pointer;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4>Total Income <i class="fas fa-arrow-down" style="font-size:0.8rem; margin-left:5px; opacity:0.5;"></i></h4>
                 <div class="value" style="color:#4CAF50;">Ksh <?php echo number_format($total_income); ?></div>
@@ -130,7 +137,7 @@ foreach ($chart_data as $Row) {
             </div>
         </a>
 
-        <a href="#" onclick="event.preventDefault(); document.getElementById('history-table').scrollIntoView({behavior: 'smooth'});" style="text-decoration:none; color:inherit; display:block;">
+        <a href="#history-table" style="text-decoration:none; color:inherit; display:block;">
             <div class="metric-card" style="border-left:4px solid #ff4b4b; transition:transform 0.2s; cursor:pointer;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4>Total Expenses <i class="fas fa-arrow-down" style="font-size:0.8rem; margin-left:5px; opacity:0.5;"></i></h4>
                 <div class="value" style="color:#ff4b4b;">Ksh <?php echo number_format($total_expense); ?></div>
@@ -138,7 +145,7 @@ foreach ($chart_data as $Row) {
             </div>
         </a>
 
-        <a href="#" onclick="event.preventDefault(); document.getElementById('income-chart').scrollIntoView({behavior: 'smooth'});" style="text-decoration:none; color:inherit; display:block;">
+        <a href="#income-chart" style="text-decoration:none; color:inherit; display:block;">
             <div class="metric-card" style="border-left:4px solid <?php echo ($net_profit >= 0) ? '#FF9800' : '#ff4b4b'; ?>; transition:transform 0.2s; cursor:pointer;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4>Net Profit <i class="fas fa-chart-line" style="font-size:0.8rem; margin-left:5px; opacity:0.5;"></i></h4>
                 <div class="value" style="color:<?php echo ($net_profit >= 0) ? '#FF9800' : '#ff4b4b'; ?>;">
