@@ -1,24 +1,30 @@
 <?php
 
 /**
- * STOCK VIEW - UPDATED
- * - Feature: "Smart Restock" with Toggle (Purchase vs Harvest).
- * - Logic: Calculates Unit Cost differently based on if you Bought it or Grew it.
- * - Feature: "Low Stock" card links to specific report.
+ * STOCK VIEW - FINAL COMPLETE
+ * - Feature: "Add Item" now asks for Initial Cost.
+ * - Feature: "Restock" has Purchase vs Harvest toggle.
+ * - Feature: "Low Stock" & "History" reports included.
  */
 
 // --- BACKEND LOGIC ---
 
-// 1. ADD NEW ITEM
+// 1. ADD NEW ITEM (Updated with Cost)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_stock'])) {
     $threshold = !empty($_POST['min_threshold']) ? intval($_POST['min_threshold']) : 10;
+
+    // Calculate Initial Value
+    $qty = floatval($_POST['quantity']);
+    $unit_cost = floatval($_POST['unit_cost']); // <--- New: Capture Initial Cost
+    $total_cost = $qty * $unit_cost;
+
     $stmt = $pdo->prepare("INSERT INTO stock (name, quantity, unit, category, min_threshold) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $threshold]);
     $id = $pdo->lastInsertId();
 
-    // Log initial creation
-    $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, user) VALUES (?, ?, 'Created', ?, ?, ?)")
-        ->execute([$id, $_POST['name'], $_POST['quantity'], $_POST['unit'], $_SESSION['username']]);
+    // Log creation with Cost Data
+    $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, user) VALUES (?, ?, 'Created', ?, ?, ?, ?, ?)")
+        ->execute([$id, $_POST['name'], $_POST['quantity'], $_POST['unit'], $unit_cost, $total_cost, $_SESSION['username']]);
 
     echo "<script>window.location.href='?page=stock';</script>";
 }
@@ -31,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_stock']) && $_SES
     echo "<script>window.location.href='?page=stock';</script>";
 }
 
-// 3. SUBMIT RESTOCK (UPDATED LOGIC)
+// 3. SUBMIT RESTOCK (Smart Logic: Purchase vs Harvest)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_restock'])) {
     $qty = floatval($_POST['quantity']);
     $source = $_POST['source_type'] ?? 'purchase'; // Default to purchase if missing
@@ -116,6 +122,13 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <datalist id="unit_list"><?php foreach ($units as $u) echo "<option value='$u'>"; ?></datalist>
                     </div>
                 </div>
+
+                <?php if (!$is_edit): ?>
+                    <div style="flex:1;">
+                        <label style="color:#aaa;">Cost per Unit (Initial Stock)</label>
+                        <input type="number" step="0.01" name="unit_cost" placeholder="Price per kg/bag" required style="width:100%; box-sizing:border-box;">
+                    </div>
+                <?php endif; ?>
 
                 <div style="flex:1;">
                     <label style="color:#aaa;">Low Stock Warning Level</label>
