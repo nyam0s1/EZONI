@@ -1,9 +1,9 @@
 <?php
 // Production Database Connection
-$host = "localhost";
-$dbname = "ezoni_farm";
-$username = "root";
-$password = "";
+$host = "sql109.infinityfree.com";
+$dbname = "if0_40917862_ezoni";
+$username = "if0_40917862";
+$password = "nyamosi2006";
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
