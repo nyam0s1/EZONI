@@ -149,7 +149,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 </select>
 
                 <div id="dob_container" style="display:none; animation: fadeIn 0.5s;">
-                    <label style="color:#4CAF50; font-size:0.9rem;">Date of Birth (Pop-up)</label>
+                    <label style="color:#4CAF50; font-size:0.9rem;">Date of Birth</label>
                     <input type="date" name="dob" id="dob_field" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #4CAF50;">
                 </div>
 
