@@ -1,23 +1,24 @@
 <?php
 
 /**
- * ANIMALS VIEW - BATCH & SALES EDITION
- * ------------------------------------
- * 1. Supports "Quantity" (for flocks of chickens vs. single cows).
- * 2. "Manage" button now handles SALES.
- * 3. Selling an animal (or part of a flock) automatically records to SALES_LOGS for profit calculation.
+ * ANIMALS VIEW - FINAL
+ * --------------------
+ * 1. Supports Batch Quantity (for Flocks).
+ * 2. Manage -> Sell records to Sales Reports.
+ * 3. Includes Validation (Error if selling > available).
+ * 4. ALL Columns included (Breed, Mother, DOB, etc).
  */
 
 // =========================================================
 // SECTION 1: BACKEND LOGIC
 // =========================================================
 
-// 1.1 REGISTER ANIMAL (Now with Quantity)
+// 1.1 REGISTER ANIMAL
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
     try {
         $cost = !empty($_POST['buying_price']) ? floatval($_POST['buying_price']) : 0.00;
         $dob = !empty($_POST['dob']) ? $_POST['dob'] : NULL;
-        $qty = !empty($_POST['quantity']) ? intval($_POST['quantity']) : 1; // Default to 1
+        $qty = !empty($_POST['quantity']) ? intval($_POST['quantity']) : 1;
 
         $stmt = $pdo->prepare("INSERT INTO animals (tag_id, name, species, gender, breed, buying_price, dob, mother_id, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
@@ -29,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
             $cost,
             $dob,
             $_POST['mother_id'] ?: NULL,
-            $qty // Save the batch size (e.g., 50 chickens)
+            $qty
         ]);
 
         $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Registered', ?, ?)")
@@ -63,11 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_animal'])) {
     echo "<script>window.location.href='?page=animals';</script>";
 }
 
-// 1.3 MANAGE / SELL ANIMAL (THE BIG UPDATE)
+// 1.3 MANAGE / SELL ANIMAL (With Validation Error)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['manage_animal'])) {
     $id = $_POST['id'];
     $tag = $_POST['tag'];
-    $action = $_POST['action_type']; // 'status_change' or 'record_sale'
+    $action = $_POST['action_type'];
 
     if ($action == 'record_sale') {
         // --- SALE LOGIC ---
@@ -75,25 +76,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['manage_animal'])) {
         $sale_price = floatval($_POST['sale_price']);
         $customer = $_POST['customer_name'] ?? 'Walk-in';
 
-        // 1. Reduce Quantity in Database
+        // VALIDATION CHECK: Get current quantity first
+        $check = $pdo->prepare("SELECT quantity FROM animals WHERE id = ?");
+        $check->execute([$id]);
+        $available_qty = $check->fetchColumn();
+
+        // If trying to sell more than available -> ERROR
+        if ($qty_sold > $available_qty) {
+            echo "<script>alert('Error: You cannot sell $qty_sold! Only $available_qty available.'); window.location.href='?page=animals';</script>";
+            exit;
+        }
+
+        // 1. Reduce Quantity
         $pdo->prepare("UPDATE animals SET quantity = quantity - ? WHERE id = ?")->execute([$qty_sold, $id]);
 
-        // 2. Check if any remain. If 0, mark as "Sold" (Inactive)
-        $current_qty = $pdo->query("SELECT quantity FROM animals WHERE id = $id")->fetchColumn();
-        if ($current_qty <= 0) {
+        // 2. If 0 remain, mark as "Sold"
+        $new_qty = $available_qty - $qty_sold;
+        if ($new_qty <= 0) {
             $pdo->prepare("UPDATE animals SET status = 'Sold' WHERE id = ?")->execute([$id]);
         }
 
-        // 3. RECORD IN SALES LOGS (For Profit Reports)
-        // This is the magic step that connects to your financial reports!
+        // 3. Record in SALES LOGS
         $pdo->prepare("INSERT INTO sales_logs (product_name, quantity, unit, total_revenue, customer_name, action_type, user) VALUES (?, ?, 'Heads', ?, ?, 'Sold', ?)")
             ->execute(["$tag (Livestock)", $qty_sold, $sale_price, $customer, $_SESSION['username']]);
 
-        // 4. Record in Animal History
+        // 4. Record in ANIMAL HISTORY
         $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Sold', ?, ?)")
             ->execute([$tag, "Sold $qty_sold for KES $sale_price", $_SESSION['username']]);
     } else {
-        // --- STANDARD STATUS CHANGE (Sick, Deceased, etc.) ---
+        // --- STATUS CHANGE ---
         $status = $_POST['status'];
         $pdo->prepare("UPDATE animals SET status = ? WHERE id = ?")->execute([$status, $id]);
         $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Status Change', ?, ?)")
@@ -134,7 +145,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <?php endforeach; ?>
                     </select>
                     <div style="flex:1;">
-                        <input type="number" name="quantity" value="1" placeholder="Qty (1 for Cow, 50 for Chicks)" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555;" required>
+                        <input type="number" name="quantity" value="1" placeholder="Qty" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555;" required>
                     </div>
                 </div>
 
@@ -290,7 +301,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
                 <div id="sale_section" style="display:none;">
                     <label style="display:block; margin-bottom:5px; color:#aaa;">Quantity to Sell:</label>
-                    <input type="number" name="qty_sold" value="1" max="<?php echo $cow['quantity']; ?>" placeholder="Qty" style="width:100%; margin-bottom:10px;">
+                    <input type="number" name="qty_sold" value="1" min="1" max="<?php echo $cow['quantity']; ?>" placeholder="Qty" style="width:100%; margin-bottom:10px;">
 
                     <label style="display:block; margin-bottom:5px; color:#aaa;">Total Sale Price (KES):</label>
                     <input type="number" step="0.01" name="sale_price" placeholder="Total Amount Recieved" style="width:100%; margin-bottom:10px;">
@@ -308,12 +319,14 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 const isSale = document.querySelector('input[name="action_type"][value="record_sale"]').checked;
                 document.getElementById('status_section').style.display = isSale ? 'none' : 'block';
                 document.getElementById('sale_section').style.display = isSale ? 'block' : 'none';
+
+                // Toggle 'Required' for price to avoid form errors
+                document.querySelector('input[name="sale_price"]').required = isSale;
             }
         </script>
     </div>
 
 <?php elseif ($action == 'history' && isset($_GET['id'])):
-    // (Same as before)
     $t = $pdo->prepare("SELECT tag_id, name FROM animals WHERE id = ?");
     $t->execute([$_GET['id']]);
     $info = $t->fetch();
@@ -369,6 +382,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <th>Qty</th>
                         <th>Breed</th>
                         <th>DOB</th>
+                        <th>Mother</th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
                     </tr>
@@ -387,6 +401,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
                             <td data-label="Breed" style="color:#ccc;"><?php echo !empty($a['breed']) ? htmlspecialchars($a['breed']) : '-'; ?></td>
                             <td data-label="DOB" style="color:#aaa;"><?php echo ($a['dob']) ? date('d M Y', strtotime($a['dob'])) : '-'; ?></td>
+                            <td data-label="Mother" style="color:#aaa;"><?php echo $a['mother_name'] ? htmlspecialchars($a['mother_name']) : '-'; ?></td>
                             <td data-label="Status"><span class="<?php echo ($a['status'] == 'Active') ? 'badge badge-green' : 'badge badge-red'; ?>"><?php echo $a['status']; ?></span></td>
 
                             <td data-label="Actions" style="text-align:right;">
