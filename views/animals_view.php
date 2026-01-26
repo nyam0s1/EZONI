@@ -1,33 +1,25 @@
 <?php
 
 /**
- * ANIMALS VIEW - LIVESTOCK MANAGEMENT
+ * ANIMALS VIEW - BATCH & SALES EDITION
  * ------------------------------------
- * This file handles the Registration, Editing, Deletion, and Viewing of animals.
- * * NEW FEATURES:
- * 1. Date of Birth (DOB) Column.
- * 2. "Pop-up" Logic: The DOB field is hidden by default. It only appears
- * when you select a Mother (implying the animal was born on the farm).
+ * 1. Supports "Quantity" (for flocks of chickens vs. single cows).
+ * 2. "Manage" button now handles SALES.
+ * 3. Selling an animal (or part of a flock) automatically records to SALES_LOGS for profit calculation.
  */
 
 // =========================================================
-// SECTION 1: BACKEND LOGIC (HANDLING FORM SUBMISSIONS)
+// SECTION 1: BACKEND LOGIC
 // =========================================================
 
-// 1.1 HANDLE NEW ANIMAL REGISTRATION
-// We check if the form was submitted (POST) and if the specific button 'add_animal' was clicked.
+// 1.1 REGISTER ANIMAL (Now with Quantity)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
     try {
-        // Sanitization: Ensure cost is a number (float). Default to 0.00 if empty.
         $cost = !empty($_POST['buying_price']) ? floatval($_POST['buying_price']) : 0.00;
-
-        // Logic: If DOB field is empty, save as NULL in database (instead of 0000-00-00).
         $dob = !empty($_POST['dob']) ? $_POST['dob'] : NULL;
+        $qty = !empty($_POST['quantity']) ? intval($_POST['quantity']) : 1; // Default to 1
 
-        // Prepare the SQL statement. We use '?' placeholders to prevent SQL Injection attacks.
-        $stmt = $pdo->prepare("INSERT INTO animals (tag_id, name, species, gender, breed, buying_price, dob, mother_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-
-        // Execute the query with the data from the form.
+        $stmt = $pdo->prepare("INSERT INTO animals (tag_id, name, species, gender, breed, buying_price, dob, mother_id, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['tag_id'],
             $_POST['name'],
@@ -35,32 +27,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
             $_POST['gender'],
             $_POST['breed'],
             $cost,
-            $dob,              // New DOB value
-            $_POST['mother_id'] ?: NULL // If mother_id is empty, save as NULL
+            $dob,
+            $_POST['mother_id'] ?: NULL,
+            $qty // Save the batch size (e.g., 50 chickens)
         ]);
 
-        // Audit Log: Record who added the animal and when.
         $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Registered', ?, ?)")
-            ->execute([$_POST['tag_id'], "Initial Value: KES $cost", $_SESSION['username']]);
+            ->execute([$_POST['tag_id'], "Initial Qty: $qty | Value: KES $cost", $_SESSION['username']]);
 
-        // Redirect back to the main list to show the new animal.
         echo "<script>window.location.href='?page=animals';</script>";
     } catch (PDOException $e) {
-        // Error Handling: If Tag ID already exists (duplicate), show an alert.
         echo "<script>alert('Error: Tag ID already exists');</script>";
     }
 }
 
-// 1.2 HANDLE EDITING AN ANIMAL
-// Only runs if 'edit_animal' button is clicked.
+// 1.2 EDIT ANIMAL
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_animal'])) {
-    // Prepare variables (handling NULLs for optional fields)
     $mother_id = $_POST['mother_id'] ?: NULL;
     $cost = floatval($_POST['buying_price']);
     $dob = !empty($_POST['dob']) ? $_POST['dob'] : NULL;
+    $qty = intval($_POST['quantity']);
 
-    // Update query: We update every field based on the ID.
-    $pdo->prepare("UPDATE animals SET tag_id = ?, name = ?, species = ?, breed = ?, buying_price = ?, dob = ?, mother_id = ? WHERE id = ?")
+    $pdo->prepare("UPDATE animals SET tag_id = ?, name = ?, species = ?, breed = ?, buying_price = ?, dob = ?, mother_id = ?, quantity = ? WHERE id = ?")
         ->execute([
             $_POST['tag_id'],
             $_POST['name'],
@@ -69,61 +57,74 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_animal'])) {
             $cost,
             $dob,
             $mother_id,
-            $_POST['id'] // Crucial: The ID tells SQL which row to update
+            $qty,
+            $_POST['id']
         ]);
-
     echo "<script>window.location.href='?page=animals';</script>";
 }
 
-// 1.3 HANDLE STATUS CHANGES (Manage)
-// This is for quick actions like marking an animal as Sold, Sick, or Deceased.
+// 1.3 MANAGE / SELL ANIMAL (THE BIG UPDATE)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['manage_animal'])) {
-    $status = $_POST['status'];
+    $id = $_POST['id'];
+    $tag = $_POST['tag'];
+    $action = $_POST['action_type']; // 'status_change' or 'record_sale'
 
-    // Update the status column
-    $pdo->prepare("UPDATE animals SET status = ? WHERE id = ?")->execute([$status, $_POST['id']]);
+    if ($action == 'record_sale') {
+        // --- SALE LOGIC ---
+        $qty_sold = intval($_POST['qty_sold']);
+        $sale_price = floatval($_POST['sale_price']);
+        $customer = $_POST['customer_name'] ?? 'Walk-in';
 
-    // Log the status change so we have a history (e.g., "Sick" -> "Active")
-    $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Status Change', ?, ?)")
-        ->execute([$_POST['tag'], $status, $_SESSION['username']]);
+        // 1. Reduce Quantity in Database
+        $pdo->prepare("UPDATE animals SET quantity = quantity - ? WHERE id = ?")->execute([$qty_sold, $id]);
+
+        // 2. Check if any remain. If 0, mark as "Sold" (Inactive)
+        $current_qty = $pdo->query("SELECT quantity FROM animals WHERE id = $id")->fetchColumn();
+        if ($current_qty <= 0) {
+            $pdo->prepare("UPDATE animals SET status = 'Sold' WHERE id = ?")->execute([$id]);
+        }
+
+        // 3. RECORD IN SALES LOGS (For Profit Reports)
+        // This is the magic step that connects to your financial reports!
+        $pdo->prepare("INSERT INTO sales_logs (product_name, quantity, unit, total_revenue, customer_name, action_type, user) VALUES (?, ?, 'Heads', ?, ?, 'Sold', ?)")
+            ->execute(["$tag (Livestock)", $qty_sold, $sale_price, $customer, $_SESSION['username']]);
+
+        // 4. Record in Animal History
+        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Sold', ?, ?)")
+            ->execute([$tag, "Sold $qty_sold for KES $sale_price", $_SESSION['username']]);
+    } else {
+        // --- STANDARD STATUS CHANGE (Sick, Deceased, etc.) ---
+        $status = $_POST['status'];
+        $pdo->prepare("UPDATE animals SET status = ? WHERE id = ?")->execute([$status, $id]);
+        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Status Change', ?, ?)")
+            ->execute([$tag, $status, $_SESSION['username']]);
+    }
 
     echo "<script>window.location.href='?page=animals';</script>";
 }
 
-// 1.4 HANDLE DELETION
-// Runs if there is a 'delete=ID' parameter in the URL.
+// 1.4 DELETE
 if (isset($_GET['delete'])) {
     $pdo->prepare("DELETE FROM animals WHERE id = ?")->execute([$_GET['delete']]);
     echo "<script>window.location.href='?page=animals';</script>";
 }
 
-// =========================================================
-// SECTION 2: FETCHING GLOBAL SETTINGS
-// =========================================================
-
-// Fetch the list of Species (Cow, Goat, etc.) from the system_options table.
-// This allows you to add new species later without changing the code.
 $species_list = $pdo->query("SELECT option_value FROM system_options WHERE option_type = 'animal_species' ORDER BY option_value ASC")->fetchAll(PDO::FETCH_COLUMN);
-
-// Determine the current 'Action' (View List, Add, Edit, etc.) based on URL.
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 ?>
 
 <?php if ($action == 'add'):
-    // Get list of females to populate the "Mother" dropdown
     $mothers = $pdo->query("SELECT id, name, species FROM animals WHERE gender='Female'")->fetchAll();
-    // Check if user pre-selected a species (e.g., came from a filtered view)
     $pre_species = isset($_GET['pre_species']) ? trim(urldecode($_GET['pre_species'])) : '';
 ?>
     <div class="form-container">
         <div class="form-header"><a href="?page=animals" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
             <h2>Register Animal</h2>
         </div>
-
         <div class="card" style="text-align:left;">
             <form method="POST" style="display:flex; flex-direction:column; gap:15px;">
-                <input type="text" name="tag_id" placeholder="Tag ID (e.g. COW-01)" required>
-                <input type="text" name="name" placeholder="Name" required>
+                <input type="text" name="tag_id" placeholder="Tag ID / Batch Name (e.g. FLOCK-A)" required>
+                <input type="text" name="name" placeholder="Name / Description" required>
 
                 <div style="display:flex; gap:10px;">
                     <select name="species" id="species" style="flex:1; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
@@ -132,15 +133,20 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                             <option value='<?php echo $s; ?>' <?php echo $selected; ?>><?php echo $s; ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <select name="gender" style="flex:1; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
-                        <option value="Female">Female</option>
-                        <option value="Male">Male</option>
-                    </select>
+                    <div style="flex:1;">
+                        <input type="number" name="quantity" value="1" placeholder="Qty (1 for Cow, 50 for Chicks)" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555;" required>
+                    </div>
                 </div>
 
+                <select name="gender" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Mixed">Mixed (For Flocks)</option>
+                </select>
+
                 <div style="display:flex; gap:10px;">
-                    <input type="text" name="breed" placeholder="Breed (e.g. Friesian)" style="flex:1; background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
-                    <input type="number" step="0.01" name="buying_price" placeholder="Cost / Value (KES)" style="flex:1; background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
+                    <input type="text" name="breed" placeholder="Breed" style="flex:1; background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
+                    <input type="number" step="0.01" name="buying_price" placeholder="Total Cost (KES)" style="flex:1; background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
                 </div>
 
                 <select name="mother_id" id="mother_id" style="padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;" onchange="toggleDob()">
@@ -149,30 +155,23 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 </select>
 
                 <div id="dob_container" style="display:none; animation: fadeIn 0.5s;">
-                    <label style="color:#4CAF50; font-size:0.9rem;">Date of Birth</label>
+                    <label style="color:#4CAF50; font-size:0.9rem;">Date of Birth (Pop-up)</label>
                     <input type="date" name="dob" id="dob_field" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #4CAF50;">
                 </div>
 
                 <button type="submit" name="add_animal" style="background:#4CAF50;">Register</button>
             </form>
         </div>
-
         <script>
-            // FUNCTION 1: Toggle the DOB field
             function toggleDob() {
                 const motherSelect = document.getElementById('mother_id');
                 const dobContainer = document.getElementById('dob_container');
-
-                // If a mother is selected (value is not empty), show DOB
                 if (motherSelect.value !== "") {
                     dobContainer.style.display = 'block';
                 } else {
-                    dobContainer.style.display = 'none'; // Otherwise hide it
+                    dobContainer.style.display = 'none';
                 }
             }
-
-            // FUNCTION 2: Filter Mothers by Species
-            // (Prevents selecting a Cow as the mother of a Goat)
             document.addEventListener("DOMContentLoaded", function() {
                 const speciesSelect = document.getElementById('species');
                 const motherSelect = document.getElementById('mother_id');
@@ -181,23 +180,18 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 function filterMothers() {
                     const selectedSpecies = speciesSelect.value;
                     motherSelect.innerHTML = '';
-                    motherSelect.appendChild(allMothers[0]); // Keep the "-- Select --" option
-
+                    motherSelect.appendChild(allMothers[0]);
                     for (let i = 1; i < allMothers.length; i++) {
                         const option = allMothers[i];
-                        // Only add mothers that match the selected species
                         if (option.getAttribute('data-species') === selectedSpecies) {
                             motherSelect.appendChild(option);
                         }
                     }
                 }
-                // Run filter whenever Species changes
                 speciesSelect.addEventListener('change', filterMothers);
-                // Run filter once on page load
                 filterMothers();
             });
         </script>
-
         <style>
             @keyframes fadeIn {
                 from {
@@ -214,12 +208,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php elseif ($action == 'edit' && isset($_GET['id'])):
-    // Fetch the specific animal to edit
     $a = $pdo->prepare("SELECT * FROM animals WHERE id = ?");
     $a->execute([$_GET['id']]);
     $animal = $a->fetch();
-
-    // Fetch potential mothers (excluding the animal itself to prevent errors)
     $mothers = $pdo->query("SELECT id, name FROM animals WHERE gender='Female' AND id != {$_GET['id']}")->fetchAll();
 ?>
     <div class="form-container">
@@ -229,34 +220,19 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
         <div class="card" style="text-align:left; border-top: 3px solid #2196F3;">
             <form method="POST" style="display:flex; flex-direction:column; gap:15px;">
                 <input type="hidden" name="id" value="<?php echo $animal['id']; ?>">
-
                 <label style="color:#aaa;">Tag ID</label>
                 <input type="text" name="tag_id" value="<?php echo $animal['tag_id']; ?>" required>
-
                 <label style="color:#aaa;">Name</label>
                 <input type="text" name="name" value="<?php echo $animal['name']; ?>" required>
 
                 <div style="display:flex; gap:10px;">
-                    <div style="flex:1;">
-                        <label style="color:#aaa;">Species</label>
-                        <select name="species" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
-                            <?php foreach ($species_list as $s): ?>
-                                <option value="<?php echo $s; ?>" <?php echo ($animal['species'] == $s) ? 'selected' : ''; ?>><?php echo $s; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div style="flex:1;"><label style="color:#aaa;">Gender (Fixed)</label><input type="text" value="<?php echo $animal['gender']; ?>" disabled style="background:#333; color:#888; border:1px solid #444;"></div>
+                    <div style="flex:1;"><label style="color:#aaa;">Species</label><select name="species" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;"><?php foreach ($species_list as $s): ?><option value="<?php echo $s; ?>" <?php echo ($animal['species'] == $s) ? 'selected' : ''; ?>><?php echo $s; ?></option><?php endforeach; ?></select></div>
+                    <div style="flex:1;"><label style="color:#aaa;">Quantity</label><input type="number" name="quantity" value="<?php echo $animal['quantity']; ?>"></div>
                 </div>
 
                 <div style="display:flex; gap:10px;">
-                    <div style="flex:1;">
-                        <label style="color:#aaa;">Breed</label>
-                        <input type="text" name="breed" value="<?php echo $animal['breed']; ?>">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="color:#aaa;">Acquisition Cost (KES)</label>
-                        <input type="number" step="0.01" name="buying_price" value="<?php echo $animal['buying_price']; ?>">
-                    </div>
+                    <div style="flex:1;"><label style="color:#aaa;">Breed</label><input type="text" name="breed" value="<?php echo $animal['breed']; ?>"></div>
+                    <div style="flex:1;"><label style="color:#aaa;">Cost</label><input type="number" step="0.01" name="buying_price" value="<?php echo $animal['buying_price']; ?>"></div>
                 </div>
 
                 <label style="color:#aaa;">Mother</label>
@@ -285,28 +261,62 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
             <h2>Manage: <?php echo $cow['name']; ?></h2>
         </div>
         <div class="card" style="text-align:left; border-top:3px solid #2196F3;">
-            <h3 style="margin-bottom:10px;">Status: <span style="color:#4CAF50;"><?php echo $cow['status']; ?></span></h3>
+            <h3 style="margin-bottom:5px;">Status: <span style="color:#4CAF50;"><?php echo $cow['status']; ?></span></h3>
+            <p style="color:#aaa; margin-bottom:15px;">Current Quantity: <strong><?php echo $cow['quantity']; ?></strong></p>
+
             <form method="POST">
                 <input type="hidden" name="id" value="<?php echo $cow['id']; ?>">
                 <input type="hidden" name="tag" value="<?php echo $cow['tag_id']; ?>">
-                <label style="display:block; margin-bottom:5px; color:#aaa;">Update Status:</label>
-                <select name="status" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px; margin-bottom:15px;">
-                    <option value="Active">Active</option>
-                    <option value="Sold">Sold</option>
-                    <option value="Deceased">Deceased</option>
-                    <option value="Sick">Sick / Isolated</option>
-                </select>
-                <button type="submit" name="manage_animal" style="background:#2196F3; width:100%;">Update Status</button>
+
+                <div style="margin-bottom:20px; background:#2c3e50; padding:10px; border-radius:8px; display:flex; gap:10px;">
+                    <label style="flex:1; cursor:pointer;">
+                        <input type="radio" name="action_type" value="status_change" checked onchange="toggleManageMode()" style="margin-right:5px;">
+                        🩺 Health/Status
+                    </label>
+                    <label style="flex:1; cursor:pointer;">
+                        <input type="radio" name="action_type" value="record_sale" onchange="toggleManageMode()" style="margin-right:5px;">
+                        💰 Sell Animal(s)
+                    </label>
+                </div>
+
+                <div id="status_section">
+                    <label style="display:block; margin-bottom:5px; color:#aaa;">Update Condition:</label>
+                    <select name="status" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px; margin-bottom:15px;">
+                        <option value="Active">Active / Healthy</option>
+                        <option value="Sick">Sick / Isolated</option>
+                        <option value="Deceased">Deceased</option>
+                    </select>
+                </div>
+
+                <div id="sale_section" style="display:none;">
+                    <label style="display:block; margin-bottom:5px; color:#aaa;">Quantity to Sell:</label>
+                    <input type="number" name="qty_sold" value="1" max="<?php echo $cow['quantity']; ?>" placeholder="Qty" style="width:100%; margin-bottom:10px;">
+
+                    <label style="display:block; margin-bottom:5px; color:#aaa;">Total Sale Price (KES):</label>
+                    <input type="number" step="0.01" name="sale_price" placeholder="Total Amount Recieved" style="width:100%; margin-bottom:10px;">
+
+                    <label style="display:block; margin-bottom:5px; color:#aaa;">Customer (Optional):</label>
+                    <input type="text" name="customer_name" placeholder="Buyer Name" style="width:100%; margin-bottom:15px;">
+                </div>
+
+                <button type="submit" name="manage_animal" style="background:#2196F3; width:100%;">Confirm Update</button>
             </form>
         </div>
+
+        <script>
+            function toggleManageMode() {
+                const isSale = document.querySelector('input[name="action_type"][value="record_sale"]').checked;
+                document.getElementById('status_section').style.display = isSale ? 'none' : 'block';
+                document.getElementById('sale_section').style.display = isSale ? 'block' : 'none';
+            }
+        </script>
     </div>
 
 <?php elseif ($action == 'history' && isset($_GET['id'])):
+    // (Same as before)
     $t = $pdo->prepare("SELECT tag_id, name FROM animals WHERE id = ?");
     $t->execute([$_GET['id']]);
     $info = $t->fetch();
-
-    // Fetch logs specifically for this animal tag
     $logs = $pdo->prepare("SELECT * FROM animal_logs WHERE animal_tag = ? ORDER BY id DESC");
     $logs->execute([$info['tag_id']]);
     $history = $logs->fetchAll();
@@ -343,7 +353,6 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php else:
-    // JOIN Query: We fetch animals AND join with the animals table again to get the Mother's Name instead of just her ID.
     $animals = $pdo->query("SELECT t1.*, t2.name AS mother_name FROM animals t1 LEFT JOIN animals t2 ON t1.mother_id = t2.id ORDER BY t1.id DESC")->fetchAll();
 ?>
     <div class="list-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -357,10 +366,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <tr>
                         <th>Tag</th>
                         <th>Name</th>
-                        <th>Species</th>
+                        <th>Qty</th>
                         <th>Breed</th>
                         <th>DOB</th>
-                        <th>Mother</th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
                     </tr>
@@ -370,21 +378,22 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <tr>
                             <td data-label="Tag"><?php echo htmlspecialchars($a['tag_id']); ?></td>
                             <td data-label="Name"><?php echo htmlspecialchars($a['name']); ?></td>
-                            <td data-label="Species"><?php echo htmlspecialchars($a['species']); ?></td>
-                            <td data-label="Breed" style="color:#ccc;"><?php echo !empty($a['breed']) ? htmlspecialchars($a['breed']) : '-'; ?></td>
 
-                            <td data-label="DOB" style="color:#aaa;">
-                                <?php echo ($a['dob']) ? date('d M Y', strtotime($a['dob'])) : '-'; ?>
+                            <td data-label="Qty">
+                                <span style="font-weight:bold; color:<?php echo ($a['quantity'] > 1) ? '#2196F3' : '#aaa'; ?>">
+                                    <?php echo $a['quantity']; ?>
+                                </span>
                             </td>
 
-                            <td data-label="Mother" style="color:#aaa;"><?php echo $a['mother_name'] ? htmlspecialchars($a['mother_name']) : '-'; ?></td>
+                            <td data-label="Breed" style="color:#ccc;"><?php echo !empty($a['breed']) ? htmlspecialchars($a['breed']) : '-'; ?></td>
+                            <td data-label="DOB" style="color:#aaa;"><?php echo ($a['dob']) ? date('d M Y', strtotime($a['dob'])) : '-'; ?></td>
                             <td data-label="Status"><span class="<?php echo ($a['status'] == 'Active') ? 'badge badge-green' : 'badge badge-red'; ?>"><?php echo $a['status']; ?></span></td>
 
                             <td data-label="Actions" style="text-align:right;">
                                 <?php if ($_SESSION['role'] == 'admin'): ?>
                                     <a href="?page=animals&action=edit&id=<?php echo $a['id']; ?>" class="badge badge-blue" style="text-decoration:none; margin-right:5px;" title="Edit Details"><i class="fas fa-pencil-alt"></i></a>
                                 <?php endif; ?>
-                                <a href="?page=animals&action=manage&id=<?php echo $a['id']; ?>" style="color:#2196F3; margin-right:10px;" title="Update Status"><i class="fas fa-edit"></i></a>
+                                <a href="?page=animals&action=manage&id=<?php echo $a['id']; ?>" style="color:#2196F3; margin-right:10px;" title="Update Status/Sell"><i class="fas fa-edit"></i></a>
                                 <a href="?page=animals&action=history&id=<?php echo $a['id']; ?>" style="color:#FF9800; margin-right:10px;" title="History"><i class="fas fa-history"></i></a>
                                 <a href="?page=animals&delete=<?php echo $a['id']; ?>" onclick="return confirm('Delete?')" style="color:#ff4b4b;"><i class="fas fa-trash"></i></a>
                             </td>
