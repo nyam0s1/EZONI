@@ -1,83 +1,125 @@
 <?php
 
 /**
- * ANIMALS VIEW - UPDATED
- * - Feature: 'Breed' field included.
- * - Feature: 'Buying Price' (Cost) added to Registration, Edit, and Table.
+ * ANIMALS VIEW - LIVESTOCK MANAGEMENT
+ * ------------------------------------
+ * This file handles the Registration, Editing, Deletion, and Viewing of animals.
+ * * NEW FEATURES:
+ * 1. Date of Birth (DOB) Column.
+ * 2. "Pop-up" Logic: The DOB field is hidden by default. It only appears
+ * when you select a Mother (implying the animal was born on the farm).
  */
 
-// --- BACKEND LOGIC ---
+// =========================================================
+// SECTION 1: BACKEND LOGIC (HANDLING FORM SUBMISSIONS)
+// =========================================================
+
+// 1.1 HANDLE NEW ANIMAL REGISTRATION
+// We check if the form was submitted (POST) and if the specific button 'add_animal' was clicked.
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
     try {
-        // NEW: Capture the cost (default to 0 if empty)
+        // Sanitization: Ensure cost is a number (float). Default to 0.00 if empty.
         $cost = !empty($_POST['buying_price']) ? floatval($_POST['buying_price']) : 0.00;
 
-        // FIXED: Added 'buying_price' to INSERT query
-        $stmt = $pdo->prepare("INSERT INTO animals (tag_id, name, species, gender, breed, buying_price, mother_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        // Logic: If DOB field is empty, save as NULL in database (instead of 0000-00-00).
+        $dob = !empty($_POST['dob']) ? $_POST['dob'] : NULL;
+
+        // Prepare the SQL statement. We use '?' placeholders to prevent SQL Injection attacks.
+        $stmt = $pdo->prepare("INSERT INTO animals (tag_id, name, species, gender, breed, buying_price, dob, mother_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+
+        // Execute the query with the data from the form.
         $stmt->execute([
             $_POST['tag_id'],
             $_POST['name'],
             $_POST['species'],
             $_POST['gender'],
             $_POST['breed'],
-            $cost, // <--- New Value
-            $_POST['mother_id'] ?: NULL
+            $cost,
+            $dob,              // New DOB value
+            $_POST['mother_id'] ?: NULL // If mother_id is empty, save as NULL
         ]);
 
-        // Log includes the cost now
+        // Audit Log: Record who added the animal and when.
         $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Registered', ?, ?)")
             ->execute([$_POST['tag_id'], "Initial Value: KES $cost", $_SESSION['username']]);
 
+        // Redirect back to the main list to show the new animal.
         echo "<script>window.location.href='?page=animals';</script>";
     } catch (PDOException $e) {
+        // Error Handling: If Tag ID already exists (duplicate), show an alert.
         echo "<script>alert('Error: Tag ID already exists');</script>";
     }
 }
 
+// 1.2 HANDLE EDITING AN ANIMAL
+// Only runs if 'edit_animal' button is clicked.
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_animal'])) {
+    // Prepare variables (handling NULLs for optional fields)
     $mother_id = $_POST['mother_id'] ?: NULL;
     $cost = floatval($_POST['buying_price']);
+    $dob = !empty($_POST['dob']) ? $_POST['dob'] : NULL;
 
-    // FIXED: Added 'buying_price' to UPDATE query
-    $pdo->prepare("UPDATE animals SET tag_id = ?, name = ?, species = ?, breed = ?, buying_price = ?, mother_id = ? WHERE id = ?")
+    // Update query: We update every field based on the ID.
+    $pdo->prepare("UPDATE animals SET tag_id = ?, name = ?, species = ?, breed = ?, buying_price = ?, dob = ?, mother_id = ? WHERE id = ?")
         ->execute([
             $_POST['tag_id'],
             $_POST['name'],
             $_POST['species'],
             $_POST['breed'],
-            $cost, // <--- New Value
+            $cost,
+            $dob,
             $mother_id,
-            $_POST['id']
+            $_POST['id'] // Crucial: The ID tells SQL which row to update
         ]);
+
     echo "<script>window.location.href='?page=animals';</script>";
 }
 
+// 1.3 HANDLE STATUS CHANGES (Manage)
+// This is for quick actions like marking an animal as Sold, Sick, or Deceased.
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['manage_animal'])) {
     $status = $_POST['status'];
+
+    // Update the status column
     $pdo->prepare("UPDATE animals SET status = ? WHERE id = ?")->execute([$status, $_POST['id']]);
-    $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Status Change', ?, ?)")->execute([$_POST['tag'], $status, $_SESSION['username']]);
+
+    // Log the status change so we have a history (e.g., "Sick" -> "Active")
+    $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Status Change', ?, ?)")
+        ->execute([$_POST['tag'], $status, $_SESSION['username']]);
+
     echo "<script>window.location.href='?page=animals';</script>";
 }
 
+// 1.4 HANDLE DELETION
+// Runs if there is a 'delete=ID' parameter in the URL.
 if (isset($_GET['delete'])) {
     $pdo->prepare("DELETE FROM animals WHERE id = ?")->execute([$_GET['delete']]);
     echo "<script>window.location.href='?page=animals';</script>";
 }
 
-// --- FETCH SETTINGS ---
+// =========================================================
+// SECTION 2: FETCHING GLOBAL SETTINGS
+// =========================================================
+
+// Fetch the list of Species (Cow, Goat, etc.) from the system_options table.
+// This allows you to add new species later without changing the code.
 $species_list = $pdo->query("SELECT option_value FROM system_options WHERE option_type = 'animal_species' ORDER BY option_value ASC")->fetchAll(PDO::FETCH_COLUMN);
 
+// Determine the current 'Action' (View List, Add, Edit, etc.) based on URL.
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 ?>
 
 <?php if ($action == 'add'):
+    // Get list of females to populate the "Mother" dropdown
     $mothers = $pdo->query("SELECT id, name, species FROM animals WHERE gender='Female'")->fetchAll();
+    // Check if user pre-selected a species (e.g., came from a filtered view)
     $pre_species = isset($_GET['pre_species']) ? trim(urldecode($_GET['pre_species'])) : '';
 ?>
     <div class="form-container">
         <div class="form-header"><a href="?page=animals" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
             <h2>Register Animal</h2>
         </div>
+
         <div class="card" style="text-align:left;">
             <form method="POST" style="display:flex; flex-direction:column; gap:15px;">
                 <input type="text" name="tag_id" placeholder="Tag ID (e.g. COW-01)" required>
@@ -101,14 +143,36 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                     <input type="number" step="0.01" name="buying_price" placeholder="Cost / Value (KES)" style="flex:1; background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
                 </div>
 
-                <select name="mother_id" id="mother_id" style="padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
-                    <option value="">-- Mother (Optional) --</option>
+                <select name="mother_id" id="mother_id" style="padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;" onchange="toggleDob()">
+                    <option value="">-- Select Mother (If Born Here) --</option>
                     <?php foreach ($mothers as $m) echo "<option value='{$m['id']}' data-species='{$m['species']}'>{$m['name']} ({$m['species']})</option>"; ?>
                 </select>
+
+                <div id="dob_container" style="display:none; animation: fadeIn 0.5s;">
+                    <label style="color:#4CAF50; font-size:0.9rem;">Date of Birth (Pop-up)</label>
+                    <input type="date" name="dob" id="dob_field" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #4CAF50;">
+                </div>
+
                 <button type="submit" name="add_animal" style="background:#4CAF50;">Register</button>
             </form>
         </div>
+
         <script>
+            // FUNCTION 1: Toggle the DOB field
+            function toggleDob() {
+                const motherSelect = document.getElementById('mother_id');
+                const dobContainer = document.getElementById('dob_container');
+
+                // If a mother is selected (value is not empty), show DOB
+                if (motherSelect.value !== "") {
+                    dobContainer.style.display = 'block';
+                } else {
+                    dobContainer.style.display = 'none'; // Otherwise hide it
+                }
+            }
+
+            // FUNCTION 2: Filter Mothers by Species
+            // (Prevents selecting a Cow as the mother of a Goat)
             document.addEventListener("DOMContentLoaded", function() {
                 const speciesSelect = document.getElementById('species');
                 const motherSelect = document.getElementById('mother_id');
@@ -117,25 +181,45 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 function filterMothers() {
                     const selectedSpecies = speciesSelect.value;
                     motherSelect.innerHTML = '';
-                    motherSelect.appendChild(allMothers[0]);
+                    motherSelect.appendChild(allMothers[0]); // Keep the "-- Select --" option
 
                     for (let i = 1; i < allMothers.length; i++) {
                         const option = allMothers[i];
+                        // Only add mothers that match the selected species
                         if (option.getAttribute('data-species') === selectedSpecies) {
                             motherSelect.appendChild(option);
                         }
                     }
                 }
+                // Run filter whenever Species changes
                 speciesSelect.addEventListener('change', filterMothers);
+                // Run filter once on page load
                 filterMothers();
             });
         </script>
+
+        <style>
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        </style>
     </div>
 
 <?php elseif ($action == 'edit' && isset($_GET['id'])):
+    // Fetch the specific animal to edit
     $a = $pdo->prepare("SELECT * FROM animals WHERE id = ?");
     $a->execute([$_GET['id']]);
     $animal = $a->fetch();
+
+    // Fetch potential mothers (excluding the animal itself to prevent errors)
     $mothers = $pdo->query("SELECT id, name FROM animals WHERE gender='Female' AND id != {$_GET['id']}")->fetchAll();
 ?>
     <div class="form-container">
@@ -153,7 +237,14 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <input type="text" name="name" value="<?php echo $animal['name']; ?>" required>
 
                 <div style="display:flex; gap:10px;">
-                    <div style="flex:1;"><label style="color:#aaa;">Species</label><select name="species" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;"><?php foreach ($species_list as $s): ?><option value="<?php echo $s; ?>" <?php echo ($animal['species'] == $s) ? 'selected' : ''; ?>><?php echo $s; ?></option><?php endforeach; ?></select></div>
+                    <div style="flex:1;">
+                        <label style="color:#aaa;">Species</label>
+                        <select name="species" style="width:100%; padding:10px; background:rgba(0,0,0,0.4); color:white; border:1px solid #555; border-radius:5px;">
+                            <?php foreach ($species_list as $s): ?>
+                                <option value="<?php echo $s; ?>" <?php echo ($animal['species'] == $s) ? 'selected' : ''; ?>><?php echo $s; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <div style="flex:1;"><label style="color:#aaa;">Gender (Fixed)</label><input type="text" value="<?php echo $animal['gender']; ?>" disabled style="background:#333; color:#888; border:1px solid #444;"></div>
                 </div>
 
@@ -175,6 +266,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <option value="<?php echo $m['id']; ?>" <?php echo ($animal['mother_id'] == $m['id']) ? 'selected' : ''; ?>><?php echo $m['name']; ?></option>
                     <?php endforeach; ?>
                 </select>
+
+                <label style="color:#aaa;">Date of Birth</label>
+                <input type="date" name="dob" value="<?php echo $animal['dob']; ?>" style="background:rgba(0,0,0,0.4); color:white; border:1px solid #555;">
 
                 <button type="submit" name="edit_animal" style="background:#2196F3; margin-top:10px;">Update Details</button>
             </form>
@@ -211,6 +305,8 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     $t = $pdo->prepare("SELECT tag_id, name FROM animals WHERE id = ?");
     $t->execute([$_GET['id']]);
     $info = $t->fetch();
+
+    // Fetch logs specifically for this animal tag
     $logs = $pdo->prepare("SELECT * FROM animal_logs WHERE animal_tag = ? ORDER BY id DESC");
     $logs->execute([$info['tag_id']]);
     $history = $logs->fetchAll();
@@ -247,6 +343,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
     </div>
 
 <?php else:
+    // JOIN Query: We fetch animals AND join with the animals table again to get the Mother's Name instead of just her ID.
     $animals = $pdo->query("SELECT t1.*, t2.name AS mother_name FROM animals t1 LEFT JOIN animals t2 ON t1.mother_id = t2.id ORDER BY t1.id DESC")->fetchAll();
 ?>
     <div class="list-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -262,7 +359,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                         <th>Name</th>
                         <th>Species</th>
                         <th>Breed</th>
-                        <th>Cost</th>
+                        <th>DOB</th>
                         <th>Mother</th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
@@ -276,8 +373,8 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                             <td data-label="Species"><?php echo htmlspecialchars($a['species']); ?></td>
                             <td data-label="Breed" style="color:#ccc;"><?php echo !empty($a['breed']) ? htmlspecialchars($a['breed']) : '-'; ?></td>
 
-                            <td data-label="Cost" style="color:#4CAF50; font-weight:bold;">
-                                <?php echo ($a['buying_price'] > 0) ? number_format($a['buying_price']) : '-'; ?>
+                            <td data-label="DOB" style="color:#aaa;">
+                                <?php echo ($a['dob']) ? date('d M Y', strtotime($a['dob'])) : '-'; ?>
                             </td>
 
                             <td data-label="Mother" style="color:#aaa;"><?php echo $a['mother_name'] ? htmlspecialchars($a['mother_name']) : '-'; ?></td>
