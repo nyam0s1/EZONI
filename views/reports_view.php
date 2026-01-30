@@ -10,7 +10,7 @@
 
 /**
  * REPORTS VIEW
- * - Update: "Net Profit" card now smooth-scrolls to the Income Chart.
+ * - Update: Production Report now displays Units next to Quantity.
  */
 
 // ... (Data fetching logic remains exactly the same) ...
@@ -95,8 +95,9 @@ foreach ($chart_data as $Row) {
                                 <td data-label="Product">
                                     <?php echo $h['product_name']; ?>
                                 </td>
+                                
                                 <td data-label="Quantity" style="font-weight:bold; color:#2196F3;">
-                                    <?php echo $h['quantity']; ?>
+                                    <?php echo $h['quantity'] . ' ' . $h['unit']; ?>
                                 </td>
                                 <td data-label="Recorded By">
                                     <?php echo $h['user']; ?>
