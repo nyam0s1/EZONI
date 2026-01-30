@@ -24,8 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_harvest'])) {
     $qty = floatval($_POST['quantity']);
     if ($qty > 0) {
         $pdo->prepare("UPDATE produce SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, user) VALUES (?, 'Harvest', ?, ?, ?)")
+
+        // FIX APPLIED HERE: Added 'total_revenue' column set to 0
+        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, total_revenue, user) VALUES (?, 'Harvest', ?, ?, 0, ?)")
             ->execute([$_POST['name'], $qty, $_POST['unit'], $_SESSION['username']]);
+
         echo "<script>window.location.href='?page=sales';</script>";
     }
 }
