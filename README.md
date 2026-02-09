@@ -64,6 +64,7 @@ The system is built on a **Modular View Architecture** using vanilla PHP, ensuri
 Ian Nyamosi
 
 Role: Full-Stack Developer & System Architect
+
 LinkedIn Profile(https://www.google.com/search?q=https://linkedin.com/in/ian-nyamosi)
 
 
