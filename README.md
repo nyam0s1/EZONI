@@ -6,8 +6,10 @@ EZONI Farm is a full-stack Farm Management System designed to digitize the chaot
 
 📸 System Previews
 1. The Command Center (Dashboard)
+
 Real-time metrics on livestock health, low-stock alerts, and daily revenue.
 2. Financial Intelligence
+
 Automated P&L reports with time-flexible filtering to analyze historical performance.
 
 ----
