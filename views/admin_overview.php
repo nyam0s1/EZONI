@@ -15,7 +15,7 @@ try {
     $stock_low = $pdo->query("SELECT COUNT(*) FROM stock WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
     $prod_low = $pdo->query("SELECT COUNT(*) FROM produce WHERE quantity <= min_threshold")->fetchColumn() ?: 0;
 
-    $sql_animal_alerts = "SELECT COUNT(*) FROM (SELECT a.species, COUNT(*) as qty, l.min_threshold FROM animals a JOIN species_limits l ON a.species = l.species WHERE a.status='Active' GROUP BY a.species, l.min_threshold HAVING qty <= l.min_threshold) as alerts";
+    $sql_animal_alerts = "SELECT COUNT(*) FROM (SELECT a.species, COUNT(*) as qty, l.min_threshold FROM animals a JOIN species_limits l ON a.species = l.species WHERE a.status='Active' GROUP BY a.species, l.min_threshold HAVING COUNT(*) <= l.min_threshold) as alerts";
     $animal_low = $pdo->query($sql_animal_alerts)->fetchColumn() ?: 0;
 
     $total_alerts = $stock_low + $prod_low + $animal_low;

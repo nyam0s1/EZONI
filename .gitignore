@@ -4,3 +4,5 @@
 .vercel/
 android/.gradle/
 android/**/build/
+.agents/
+skills-lock.json

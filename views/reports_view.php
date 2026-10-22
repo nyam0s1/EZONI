@@ -100,7 +100,7 @@ foreach ($chart_data as $Row) {
                                     <?php echo $h['quantity'] . ' ' . $h['unit']; ?>
                                 </td>
                                 <td data-label="Recorded By">
-                                    <?php echo $h['user']; ?>
+                                    <?php echo $h['performed_by']; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

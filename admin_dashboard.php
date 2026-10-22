@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'includes/db.php';
+require_once 'includes/db.php';
 
 // --- SESSION CHECK ---
 $timeout_duration = 1800;

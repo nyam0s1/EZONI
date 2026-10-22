@@ -27,7 +27,7 @@ try {
             JOIN species_limits l ON a.species = l.species 
             WHERE a.status='Active' 
             GROUP BY a.species, l.min_threshold 
-            HAVING qty <= l.min_threshold
+            HAVING COUNT(*) <= l.min_threshold
         ) as alerts
     ";
     $animal_low = $pdo->query($sql_animal_alerts)->fetchColumn() ?: 0;

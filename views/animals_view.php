@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_animal'])) {
             $qty
         ]);
 
-        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Registered', ?, ?)")
+        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, performed_by) VALUES (?, 'Registered', ?, ?)")
             ->execute([$_POST['tag_id'], "Initial Qty: $qty | Value: KES $cost", $_SESSION['username']]);
 
         echo "<script>window.location.href='?page=animals';</script>";
@@ -97,17 +97,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['manage_animal'])) {
         }
 
         // 3. Record in SALES LOGS
-        $pdo->prepare("INSERT INTO sales_logs (product_name, quantity, unit, total_revenue, customer_name, action_type, user) VALUES (?, ?, 'Heads', ?, ?, 'Sold', ?)")
+        $pdo->prepare("INSERT INTO sales_logs (product_name, quantity, unit, total_revenue, customer_name, action_type, performed_by) VALUES (?, ?, 'Heads', ?, ?, 'Sold', ?)")
             ->execute(["$tag (Livestock)", $qty_sold, $sale_price, $customer, $_SESSION['username']]);
 
         // 4. Record in ANIMAL HISTORY
-        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Sold', ?, ?)")
+        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, performed_by) VALUES (?, 'Sold', ?, ?)")
             ->execute([$tag, "Sold $qty_sold for KES $sale_price", $_SESSION['username']]);
     } else {
         // --- STATUS CHANGE ---
         $status = $_POST['status'];
         $pdo->prepare("UPDATE animals SET status = ? WHERE id = ?")->execute([$status, $id]);
-        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, user) VALUES (?, 'Status Change', ?, ?)")
+        $pdo->prepare("INSERT INTO animal_logs (animal_tag, action_type, details, performed_by) VALUES (?, 'Status Change', ?, ?)")
             ->execute([$tag, $status, $_SESSION['username']]);
     }
 
@@ -354,7 +354,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                             <tr>
                                 <td data-label="Action"><span class="badge badge-blue"><?php echo $h['action_type']; ?></span></td>
                                 <td data-label="Details"><?php echo $h['details'] ? $h['details'] : '-'; ?></td>
-                                <td data-label="User"><?php echo $h['user']; ?></td>
+                                <td data-label="User"><?php echo $h['performed_by']; ?></td>
                                 <td data-label="Date" style="color:#888;"><?php echo date('d M Y, H:i', strtotime($h['log_date'])); ?></td>
                             </tr>
                         <?php endforeach; ?>

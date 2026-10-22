@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_harvest'])) {
         $pdo->prepare("UPDATE produce SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $_POST['id']]);
         
         // FIX APPLIED HERE: Added 'total_revenue' column set to 0
-        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, total_revenue, user) VALUES (?, 'Harvest', ?, ?, 0, ?)")
+        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, total_revenue, performed_by) VALUES (?, 'Harvest', ?, ?, 0, ?)")
             ->execute([$_POST['name'], $qty, $_POST['unit'], $_SESSION['username']]);
             
         echo "<script>window.location.href='?page=sales';</script>";
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_sell'])) {
     if ($qty > 0 && $curr >= $qty) {
         $pdo->prepare("UPDATE produce SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $_POST['id']]);
 
-        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, unit_price, total_revenue, customer_name, user) VALUES (?, 'Sold', ?, ?, ?, ?, ?, ?)")
+        $pdo->prepare("INSERT INTO sales_logs (product_name, action_type, quantity, unit, unit_price, total_revenue, customer_name, performed_by) VALUES (?, 'Sold', ?, ?, ?, ?, ?, ?)")
             ->execute([$_POST['name'], $qty, $_POST['unit'], $price, $total, $customer, $_SESSION['username']]);
 
         echo "<script>window.location.href='?page=sales';</script>";
@@ -199,7 +199,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                                 </td>
                                 <td data-label="Qty"><strong><?php echo $h['quantity'] . ' ' . $h['unit']; ?></strong></td>
                                 <td data-label="Revenue"><?php echo ($h['total_revenue'] > 0) ? '+' . $h['total_revenue'] : '-'; ?></td>
-                                <td data-label="User"><?php echo $h['user']; ?></td>
+                                <td data-label="User"><?php echo $h['performed_by']; ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

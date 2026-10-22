@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $projectRoot = dirname(__DIR__);
-$route = $_GET['__ezoni_route'] ?? '';
+$route = $_GET['__ezoni_route'] ?? parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 unset($_GET['__ezoni_route']);
 
 if (!is_string($route)) {
@@ -54,6 +54,10 @@ if (!isset($entrypoints[$route])) {
 
 require_once $projectRoot . '/includes/db.php';
 require_once $projectRoot . '/includes/PdoSessionHandler.php';
+
+// Authenticated pages and session cookies must never be cached by a shared CDN.
+header('Cache-Control: private, no-store');
+header('X-Content-Type-Options: nosniff');
 
 $forwardedProtocol = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
 $isSecureRequest = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')

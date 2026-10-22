@@ -27,15 +27,23 @@ final class EzoniPdoSessionHandler implements SessionHandlerInterface
         $stmt->execute([$id, time()]);
         $data = $stmt->fetchColumn();
 
-        return $data === false ? '' : (string) $data;
+        if ($data === false) {
+            return '';
+        }
+        // Text storage avoids driver-specific BLOB/bytea handling and preserves bytes.
+        return base64_decode((string) $data, true) ?: '';
     }
 
     public function write(string $id, string $data): bool
     {
         $expiresAt = time() + (int) ini_get('session.gc_maxlifetime');
+        $data = base64_encode($data);
+        $upsert = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+            ? 'ON CONFLICT (session_id) DO UPDATE SET session_data = ?, expires_at = ?'
+            : 'ON DUPLICATE KEY UPDATE session_data = ?, expires_at = ?';
         $stmt = $this->pdo->prepare(
             'INSERT INTO app_sessions (session_id, session_data, expires_at) VALUES (?, ?, ?) '
-            . 'ON DUPLICATE KEY UPDATE session_data = ?, expires_at = ?'
+            . $upsert
         );
         $stmt->execute([$id, $data, $expiresAt, $data, $expiresAt]);
 

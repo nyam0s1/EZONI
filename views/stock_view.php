@@ -19,12 +19,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_stock'])) {
     $unit_cost = floatval($_POST['unit_cost']);
     $total_cost = $qty * $unit_cost; // Backend verification
 
-    $stmt = $pdo->prepare("INSERT INTO stock (name, quantity, unit, category, min_threshold) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $threshold]);
-    $id = $pdo->lastInsertId();
+    $id = ezoniInsertAndGetId(
+        $pdo,
+        "INSERT INTO stock (name, quantity, unit, category, min_threshold) VALUES (?, ?, ?, ?, ?)",
+        [$_POST['name'], $_POST['quantity'], $_POST['unit'], $_POST['category'], $threshold]
+    );
 
     // Log creation
-    $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, user) VALUES (?, ?, 'Created', ?, ?, ?, ?, ?)")
+    $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, performed_by) VALUES (?, ?, 'Created', ?, ?, ?, ?, ?)")
         ->execute([$id, $_POST['name'], $_POST['quantity'], $_POST['unit'], $unit_cost, $total_cost, $_SESSION['username']]);
 
     echo "<script>window.location.href='?page=stock';</script>";
@@ -57,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_restock'])) {
 
     if ($qty > 0) {
         $pdo->prepare("UPDATE stock SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-        $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, user) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, unit_cost, total_cost, performed_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
             ->execute([$_POST['id'], $_POST['name'], $action_label, $qty, $_POST['unit'], $cost, $total, $_SESSION['username']]);
 
         echo "<script>window.location.href='?page=stock';</script>";
@@ -71,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_use'])) {
 
     if ($qty > 0 && $curr >= $qty) {
         $pdo->prepare("UPDATE stock SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $_POST['id']]);
-        $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, user) VALUES (?, ?, 'Used', ?, ?, ?)")
+        $pdo->prepare("INSERT INTO stock_logs (item_id, item_name, action_type, quantity, unit, performed_by) VALUES (?, ?, 'Used', ?, ?, ?)")
             ->execute([$_POST['id'], $_POST['name'], $qty, $_POST['unit'], $_SESSION['username']]);
         echo "<script>window.location.href='?page=stock';</script>";
     } else {
@@ -330,7 +332,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                                 <td data-label="Cost">
                                     <?php echo ($r['total_cost'] > 0) ? '<span style="color:#ff4b4b">-' . $r['total_cost'] . '</span>' : '-'; ?>
                                 </td>
-                                <td data-label="User"><?php echo $r['user']; ?></td>
+                                <td data-label="User"><?php echo $r['performed_by']; ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -375,7 +377,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                                 </td>
                                 <td data-label="Qty"><strong><?php echo $h['quantity'] . ' ' . $h['unit']; ?></strong></td>
                                 <td data-label="Cost"><?php echo ($h['total_cost'] > 0) ? $h['total_cost'] : '-'; ?></td>
-                                <td data-label="User"><?php echo $h['user']; ?></td>
+                                <td data-label="User"><?php echo $h['performed_by']; ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

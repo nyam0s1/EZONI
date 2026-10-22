@@ -3,5 +3,12 @@
 /android
 /README.md
 /reset_user.php
+/.github
+/.htaccess
+/database/README.md
+/work
+/.agents
+/skills-lock.json
+/database/certs/README.md
 /.env
 /.env.*

@@ -33,7 +33,7 @@ Automated P&L reports with time-flexible filtering to analyze historical perform
 
 * Role-Based Access Control (RBAC): Distinct `Admin` (System Config) vs. `User` (Day-to-Day) interfaces.
 * Audit Trails: Logs every critical action (Login, Stock Adjustment, Sale) with `User ID`, `Timestamp`, and `IP`.
-* Secure Auth: Implements Bcrypt Hashing for passwords and enforces **HTTPS/SSL** via `.htaccess`.
+* Secure Auth: Uses PHP password hashing and HTTPS on Vercel.
 
 📱 Progressive Web App (PWA)
 
@@ -47,7 +47,7 @@ Automated P&L reports with time-flexible filtering to analyze historical perform
 The system is built on a **Modular View Architecture** using vanilla PHP, ensuring high performance with zero framework overhead.
 
 * Backend: PHP (PDO Data Objects) for database abstraction and security.
-* Database: MySQL (Relational Schema) with normalized tables for `Users`, `Animals`, `Stock`, `Sales`, and `Logs`.
+* Database: PostgreSQL or MySQL with relational tables for users, animals, stock, sales and logs.
 * Frontend: Custom CSS variables for theming (Dark Mode default) and CSS Grid/Flexbox for layout.
 
 ### Database Schema (Simplified)
@@ -72,15 +72,16 @@ LinkedIn Profile(https://www.google.com/search?q=https://linkedin.com/in/ian-nya
 
 ## Vercel deployment
 
-This app remains PHP. The Vercel setup uses Vercel's community PHP runtime and a single routed function to keep the existing PHP pages and static assets together. The app's PHP sessions are stored in MySQL so logins survive separate serverless function instances.
+Vercel is the deployment target. The previous InfinityFree FTP deployment workflow has been removed. The app keeps its existing PHP screens, CSS, login, role navigation and farm workflows. A single routed function uses the [community PHP runtime](https://github.com/vercel-community/php), and PHP sessions are stored in the database so logins survive separate function instances.
 
-1. Import this GitHub repository into Vercel and set the production branch to `android` while preparing the migration.
-2. Add `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` in the Vercel project's Environment Variables. Do not commit the values.
-3. Provision a MySQL-compatible database, import a current database export, and run [`database/migrations/001_app_sessions.sql`](database/migrations/001_app_sessions.sql).
-4. Verify the Vercel deployment and its copied records before changing the Android app's `ezoniWebBaseUrl` to the new deployment address.
-5. For a separate Android database, create a second Vercel project from the same branch, configure it with the copied mobile database's credentials, and build Android with `-PezoniWebBaseUrl=<mobile-project-url>`.
-6. After the new deployment is verified, remove the existing InfinityFree FTP workflow and set the Vercel project to the intended production branch.
+This is a fresh installation. No records or accounts were recovered from the unavailable old database. The repository includes schemas for [PostgreSQL](database/schema_postgres.sql) and [MySQL](database/schema.sql) and a CLI initializer; the simplified schema above is only an overview. Starter categories and species can be edited through the existing **Admin > Settings** pages.
 
-The current InfinityFree database export is not stored in this repository. The copied database must include the complete existing schema and records; the README's simplified schema is not enough to recreate it.
+1. Import this repository into Vercel, use `main` as the production branch and the repository root as the source directory. The `android` branch also contains the Android app and deployment changes. Keep the repository's `vercel.json` configuration and set the framework preset to **Other**.
+2. Add a Neon PostgreSQL database through Vercel's Marketplace and connect it to the project. The app reads the project's `DATABASE_URL` connection string. Use TLS in the connection string, and use a direct connection for initialization if the provider supplies separate direct and pooled URLs. For independent web and Android records, provision a separate database for each installation.
+3. From a trusted terminal with PHP and `pdo_pgsql`, set `DATABASE_URL`, `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD`, then run `php database/initialize.php` from the repository root. The initializer selects the matching schema and creates the first active administrator with a hashed password. See [`database/README.md`](database/README.md) for the full setup contract.
+4. Clear the `INITIAL_ADMIN_*` variables after setup; keep them out of Vercel's application environment. Confirm that `DATABASE_URL` is available in the project's intended deployment environment, then deploy and verify login, navigation, record changes and reports.
+5. Build Android with `-PezoniWebBaseUrl=<verified-https-deployment-url>/`. For a separate Android database, use a second Vercel project with its own database settings and pass that project's verified HTTPS address. See [`android/README.md`](android/README.md).
 
-For local PHP development, configure these values in the local PHP server environment. `.env.example` documents the required names; PHP does not load `.env` files automatically, and `.env` is ignored by Git.
+A hosted MySQL-compatible database remains supported. Use PHP with `pdo_mysql` and set `DB_HOST`, `DB_PORT` (default `3306`), `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and `DB_SSL_REQUIRED=true` instead of `DATABASE_URL`. If the provider supplies a CA certificate, set `DB_SSL_CA` to its readable PEM file path; on Vercel that path must refer to a file available to the deployed function. Run the same CLI initializer against the empty database.
+
+Keep database and administrator credentials out of Git. `.env.example` documents the environment settings; PHP does not load `.env` files automatically. Registration continues to create pending users, which an administrator approves through the existing Users screen.

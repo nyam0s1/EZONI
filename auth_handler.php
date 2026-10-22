@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'includes/db.php';
+require_once 'includes/db.php';
 
 if ($_SERVER["REQUEST_METHOD"] != "POST") {
     header("Location: index.php");
@@ -41,6 +41,7 @@ if ($action == 'login') {
         }
 
         // CHECK 3: SUCCESS
+        session_regenerate_id(true);
         $_SESSION['user_id'] = $account['id'];
         $_SESSION['username'] = $account['username'];
         $_SESSION['role'] = $account['role'];
@@ -82,11 +83,13 @@ elseif ($action == 'register') {
     $hashed_pass = password_hash($password, PASSWORD_DEFAULT);
 
     // Status is 'pending' by default
-    $stmt = $pdo->prepare("INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, 'user', 'pending')");
+    $new_id = ezoniInsertAndGetId(
+        $pdo,
+        "INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, 'user', 'pending')",
+        [$username, $email, $hashed_pass]
+    );
 
-    if ($stmt->execute([$username, $email, $hashed_pass])) {
-
-        $new_id = $pdo->lastInsertId();
+    if ($new_id !== '') {
         $pdo->prepare("INSERT INTO user_logs (user_id, action_type, performed_by) VALUES (?, 'Registration Request', 'Self-Register')")->execute([$new_id]);
 
         // UPDATE: Specific pending flag

@@ -30,8 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_user'])) {
     } else {
         $hashed = password_hash($password, PASSWORD_DEFAULT);
         $sql = "INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, 'active')";
-        $pdo->prepare($sql)->execute([$username, $email, $hashed, $role]);
-        $new_id = $pdo->lastInsertId();
+        $new_id = ezoniInsertAndGetId($pdo, $sql, [$username, $email, $hashed, $role]);
         log_user_action($pdo, $new_id, 'Account Created');
         echo "<script>window.location.href='?page=users';</script>";
     }
@@ -324,9 +323,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
                 <tbody>
                     <?php foreach ($users as $u): ?>
                         <?php
-                        $alert_sql = "SELECT id FROM user_logs WHERE user_id = ? AND action_type = 'Blocked Login Attempt' AND log_date > (NOW() - INTERVAL 1 DAY)";
+                        $alert_sql = "SELECT id FROM user_logs WHERE user_id = ? AND action_type = 'Blocked Login Attempt' AND log_date > ?";
                         $stmt = $pdo->prepare($alert_sql);
-                        $stmt->execute([$u['id']]);
+                        $stmt->execute([$u['id'], date('Y-m-d H:i:s', time() - 86400)]);
                         $has_attempt = $stmt->rowCount() > 0;
                         ?>
                         <tr>
