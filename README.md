@@ -1,71 +1,25 @@
-🌾 Ezoni Farm ERP
+# EZONI Farm for Android
 
-A Digital Operating System for Modern Agriculture
+The Android app opens the EZONI Farm web application in Android WebView, preserving its pages, styling, login, and farm workflows. Android 8.0 or newer is required.
 
-EZONI Farm is a full-stack Farm Management System designed to digitize the chaotic operations of livestock and crop farming. It replaces manual record-keeping with a centralized, secure, and data-driven dashboard.
+## Repository branches
 
-📸 System Previews
-1. The Command Center (Dashboard)
+* `main`: Stable web application.
+* `web`: Web application source, kept aligned with `main`.
+* `android`: Android app source in the `android/` folder.
 
-Real-time metrics on livestock health, low-stock alerts, and daily revenue.
+Open the `android/` folder in Android Studio. See [the Android README](android/README.md) for build details.
 
-2. Financial Intelligence
+## Build a debug APK
 
-Automated P&L reports with time-flexible filtering to analyze historical performance.
+From the `android/` folder on Windows:
 
-----
+```powershell
+.\gradlew.bat assembleDebug
+```
 
-🚀 Key Features
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. A release signing configuration has not been added.
 
-🐄 Smart Livestock Tracking
+## Connection and offline preview
 
-* Lineage Management: Tracks parentage (Mother ID) to monitor breeding cycles and genetic health.
-* Batch & Tagging: Supports individual tagging (e.g., COW-001) or batch management for flocks (e.g., FLOCK-A).
-* Status Lifecycle: Manages states like `Active`, `Sick/Isolated`, `Deceased`, or `Sold` with audit logs.
-
-💰 Financial Engine
-
-* Net Profit Algorithms: Automatically calculates `(Sales Revenue) - (Feed/Input Costs)` to show true profitability.
-* Visual Analytics: Integrated Chart.js to render income trends over custom date ranges.
-* Inventory Cost Averaging: Tracks unit costs of inputs (feeds, meds) to calculate precise expenses.
-
-🔐 Enterprise-Grade Security
-
-* Role-Based Access Control (RBAC): Distinct `Admin` (System Config) vs. `User` (Day-to-Day) interfaces.
-* Audit Trails: Logs every critical action (Login, Stock Adjustment, Sale) with `User ID`, `Timestamp`, and `IP`.
-* Secure Auth: Uses PHP password hashing and HTTPS.
-
-📱 Progressive Web App (PWA)
-
-* Mobile-First Design: Fully responsive Glassmorphism UI that works on smartphones in the field.
-* Installable: Includes `manifest.json` for "Add to Home Screen" capability.
-
-----
-
-🛠️ Technical Architecture
-
-The system is built on a **Modular View Architecture** using vanilla PHP, ensuring high performance with zero framework overhead.
-
-* Backend: PHP (PDO Data Objects) for database abstraction and security.
-* Database: PostgreSQL or MySQL with relational tables for users, animals, stock, sales and logs.
-* Frontend: Custom CSS variables for theming (Dark Mode default) and CSS Grid/Flexbox for layout.
-
-### Database Schema (Simplified)
-
-* `users`: Stores credentials and role definitions.
-* `animals`: Handles biological data, breed, and status.
-* `stock`: Inventory levels with `min_threshold` triggers.
-* `sales_logs` & `stock_logs`: The immutable ledger for all financial transactions.
-
-----
-
-👨‍💻 Author
-
-Ian Nyamosi
-
-Role: Full-Stack Developer & System Architect
-
-LinkedIn Profile(https://www.google.com/search?q=https://linkedin.com/in/ian-nyamosi)
-
-
-*Built with ❤️ and PHP in Nairobi, Kenya.*
+The app connects to [EZONI Farm](https://ezoni-farm.vercel.app/). Login, farm records, reports, and saving changes require an internet connection. The connection error screen offers an optional static offline preview with placeholder screens. It does not store farm records or synchronize offline changes.

@@ -1,19 +1,29 @@
 # EZONI Farm for Android
 
-The Android app opens the EZONI Farm PHP site inside Android WebView. It uses the same pages, styling, login flow, role navigation, database records and JavaScript interactions as the web app. The Vercel setup preserves those existing screens and workflows.
+The Android app opens the EZONI Farm site inside Android WebView. It uses the same pages, styling, login flow, role navigation, database records, and JavaScript interactions as the web app. The web source is maintained on the repository's `main` and `web` branches.
 
-The default address is the live Vercel deployment at https://ezoni-android.vercel.app/. To use another verified HTTPS deployment, pass its address as the `ezoniWebBaseUrl` Gradle property.
+## Open in Android Studio
 
-```powershell
-.\gradlew.bat assembleDebug -PezoniWebBaseUrl=https://your-verified-deployment.example/
-```
-
-The Vercel project uses Neon PostgreSQL through its `DATABASE_URL` environment variable. Initialize the fresh database with [`database/initialize.php`](../database/initialize.php), using `DATABASE_URL` and `INITIAL_ADMIN_*` from a trusted terminal with PHP's `pdo_pgsql` extension. A hosted MySQL-compatible database is also supported through `DB_*` settings. See [`database/README.md`](../database/README.md) for setup details.
-
-No old farm records or accounts were recovered. Starter categories and species are editable through **Admin > Settings**. To keep Android records independent from the web installation, initialize a separate database, connect a separate Vercel project to it over TLS, and build with that project's HTTPS address.
-
-The WebView enables JavaScript and DOM storage, preserves first-party PHP session cookies, keeps links on the configured HTTPS host inside the app, and opens external HTTPS, email and phone links with their normal Android handlers. PHP sessions are stored in the deployment's database. The WebView rejects cleartext traffic and cancels unverified TLS connections. The Compose farm preview remains available from the connection error screen for offline viewing.
+Open this `android/` folder as the project and allow Gradle to synchronize. The app requires Android 8.0 or newer.
 
 ## Build a debug APK
 
-On Windows, run `gradlew.bat assembleDebug` from this folder to use the default live deployment, or pass the override shown above. The generated APK is saved to `app/build/outputs/apk/debug/app-debug.apk`. A signed release build has not been configured yet.
+On Windows, run from this folder:
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+The generated APK is saved to `app/build/outputs/apk/debug/app-debug.apk`. A signed release build has not been configured yet.
+
+The app uses [EZONI Farm](https://ezoni-farm.vercel.app/) by default. To use another HTTPS instance, pass the `ezoniWebBaseUrl` Gradle property:
+
+```powershell
+.\gradlew.bat assembleDebug -PezoniWebBaseUrl=https://your-farm.example/
+```
+
+## Connection and offline preview
+
+The WebView enables JavaScript and DOM storage, preserves first-party session cookies, keeps links on the configured HTTPS host inside the app, and opens external HTTPS, email, and phone links with their normal Android handlers. It rejects cleartext traffic and unverified TLS connections.
+
+Login, live farm records, reports, and saving changes require internet. The connection error screen offers a static Compose preview with placeholder screens. The preview does not store farm records or synchronize changes.
