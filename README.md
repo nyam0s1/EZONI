@@ -72,6 +72,8 @@ LinkedIn Profile(https://www.google.com/search?q=https://linkedin.com/in/ian-nya
 
 ## Vercel deployment
 
+Live deployment: https://ezoni-android.vercel.app/ (also the Android app's default address).
+
 Vercel is the deployment target. The previous InfinityFree FTP deployment workflow has been removed. The app keeps its existing PHP screens, CSS, login, role navigation and farm workflows. A single routed function uses the [community PHP runtime](https://github.com/vercel-community/php), and PHP sessions are stored in the database so logins survive separate function instances.
 
 This is a fresh installation. No records or accounts were recovered from the unavailable old database. The repository includes schemas for [PostgreSQL](database/schema_postgres.sql) and [MySQL](database/schema.sql) and a CLI initializer; the simplified schema above is only an overview. Starter categories and species can be edited through the existing **Admin > Settings** pages.

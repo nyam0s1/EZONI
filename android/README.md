@@ -2,7 +2,7 @@
 
 The Android app opens the EZONI Farm PHP site inside Android WebView. It uses the same pages, styling, login flow, role navigation, database records and JavaScript interactions as the web app. The Vercel setup preserves those existing screens and workflows.
 
-Build against a verified Vercel HTTPS deployment by passing its address as the `ezoniWebBaseUrl` Gradle property. The production address is configured after deployment; do not assume a placeholder is a working server.
+The default address is the live Vercel deployment at https://ezoni-android.vercel.app/. To use another verified HTTPS deployment, pass its address as the `ezoniWebBaseUrl` Gradle property.
 
 ```powershell
 .\gradlew.bat assembleDebug -PezoniWebBaseUrl=https://your-verified-deployment.example/
@@ -16,4 +16,4 @@ The WebView enables JavaScript and DOM storage, preserves first-party PHP sessio
 
 ## Build a debug APK
 
-On Windows, run the Gradle command above from this folder with the verified deployment address. The generated APK is saved to `app/build/outputs/apk/debug/app-debug.apk`. A signed release build has not been configured yet.
+On Windows, run `gradlew.bat assembleDebug` from this folder to use the default live deployment, or pass the override shown above. The generated APK is saved to `app/build/outputs/apk/debug/app-debug.apk`. A signed release build has not been configured yet.

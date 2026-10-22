@@ -3,6 +3,7 @@
 !.env.example
 .vercel/
 android/.gradle/
+android/.kotlin/
 android/**/build/
 .agents/
 skills-lock.json

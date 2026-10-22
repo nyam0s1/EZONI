@@ -4,7 +4,7 @@ plugins {
 }
 
 val ezoniWebBaseUrl = providers.gradleProperty("ezoniWebBaseUrl")
-    .orElse("https://ezoni.rf.gd/")
+    .orElse("https://ezoni-android.vercel.app/")
     .get()
 
 android {
