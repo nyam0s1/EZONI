@@ -4,6 +4,12 @@ A Digital Operating System for Modern Agriculture
 
 EZONI Farm is a full-stack Farm Management System designed to digitize the chaotic operations of livestock and crop farming. It replaces manual record-keeping with a centralized, secure, and data-driven dashboard.
 
+### Repository branches
+
+* `main`: Stable web application.
+* `web`: Web application source, kept aligned with `main`.
+* `android`: Android application and its web backend while the mobile app is being tested.
+
 📸 System Previews
 1. The Command Center (Dashboard)
 
