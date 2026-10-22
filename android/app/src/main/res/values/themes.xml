@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.Ezoni" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/ezoni_green</item>
+        <item name="android:statusBarColor">@color/ezoni_background</item>
+        <item name="android:navigationBarColor">@color/ezoni_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">@color/ezoni_background</item>
+    </style>
+</resources>
