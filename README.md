@@ -69,3 +69,18 @@ LinkedIn Profile(https://www.google.com/search?q=https://linkedin.com/in/ian-nya
 
 
 *Built with ❤️ and PHP in Nairobi, Kenya.*
+
+## Vercel deployment
+
+This app remains PHP. The Vercel setup uses Vercel's community PHP runtime and a single routed function to keep the existing PHP pages and static assets together. The app's PHP sessions are stored in MySQL so logins survive separate serverless function instances.
+
+1. Import this GitHub repository into Vercel and set the production branch to `android` while preparing the migration.
+2. Add `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` in the Vercel project's Environment Variables. Do not commit the values.
+3. Provision a MySQL-compatible database, import a current database export, and run [`database/migrations/001_app_sessions.sql`](database/migrations/001_app_sessions.sql).
+4. Verify the Vercel deployment and its copied records before changing the Android app's `ezoniWebBaseUrl` to the new deployment address.
+5. For a separate Android database, create a second Vercel project from the same branch, configure it with the copied mobile database's credentials, and build Android with `-PezoniWebBaseUrl=<mobile-project-url>`.
+6. After the new deployment is verified, remove the existing InfinityFree FTP workflow and set the Vercel project to the intended production branch.
+
+The current InfinityFree database export is not stored in this repository. The copied database must include the complete existing schema and records; the README's simplified schema is not enough to recreate it.
+
+For local PHP development, configure these values in the local PHP server environment. `.env.example` documents the required names; PHP does not load `.env` files automatically, and `.env` is ignored by Git.

@@ -2,7 +2,7 @@
 
 The Android app opens the existing EZONI Farm PHP site inside Android WebView. This keeps its current pages, styling, login flow, role-based navigation, database-backed records, and JavaScript interactions in sync with the web app instead of maintaining a second copy of those features in native screens.
 
-The default site address is `https://ezoni.rf.gd/`. To build against another deployment, pass a Gradle property:
+The default site address is `https://ezoni.rf.gd/`. To build against a Vercel deployment or the separate Android deployment, pass the address assigned to that Vercel project as a Gradle property:
 
 ```powershell
 .\gradlew.bat assembleDebug -PezoniWebBaseUrl=https://your-farm-site.example/
